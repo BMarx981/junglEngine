@@ -52,6 +52,7 @@ class _ChopGridState extends ConsumerState<ChopGrid> {
               children: [
                 _SliceGutter(
                   sliceCount: beat.sliceCount,
+                  rowsPerBar: state.sliceDivision,
                   rowHeight: rowHeight,
                   analysis: state.analysis,
                   onTapSlice: (slice) =>
@@ -87,6 +88,7 @@ class _ChopGridState extends ConsumerState<ChopGrid> {
                             steps: beat.chop.steps,
                             sliceCount: beat.sliceCount,
                             rowHeight: rowHeight,
+                            rowsPerBar: state.sliceDivision,
                           ),
                         ),
                         CustomPaint(
@@ -136,12 +138,14 @@ class _ChopGridState extends ConsumerState<ChopGrid> {
 class _SliceGutter extends StatelessWidget {
   const _SliceGutter({
     required this.sliceCount,
+    required this.rowsPerBar,
     required this.rowHeight,
     required this.analysis,
     required this.onTapSlice,
   });
 
   final int sliceCount;
+  final int rowsPerBar;
   final double rowHeight;
   final SliceAnalysis? analysis;
   final ValueChanged<int> onTapSlice;
@@ -177,7 +181,11 @@ class _SliceGutter extends StatelessWidget {
                         child: Text(
                           '${slice + 1}',
                           style: TextStyle(
-                            color: JungleTheme.textDim,
+                            // The first slice of each bar reads brighter, so a
+                            // long grid can be scanned rather than counted.
+                            color: rowsPerBar > 0 && slice % rowsPerBar == 0
+                                ? JungleTheme.text
+                                : JungleTheme.textDim,
                             fontSize: rowHeight < 26 ? 8 : 10,
                             fontWeight: FontWeight.w700,
                           ),
@@ -199,11 +207,16 @@ class _GridPainter extends CustomPainter {
     required this.steps,
     required this.sliceCount,
     required this.rowHeight,
+    required this.rowsPerBar,
   });
 
   final List<int?> steps;
   final int sliceCount;
   final double rowHeight;
+
+  /// Slices in one bar of the break. A four bar break at 16 divisions is 64
+  /// rows, which needs a landmark every bar to be navigable.
+  final int rowsPerBar;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -253,7 +266,12 @@ class _GridPainter extends CustomPainter {
     }
     for (var slice = 0; slice <= sliceCount; slice++) {
       final y = slice * rowHeight;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), thin);
+      final startsBar = rowsPerBar > 0 && slice % rowsPerBar == 0;
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.width, y),
+        startsBar ? thick : thin,
+      );
     }
   }
 
@@ -261,6 +279,7 @@ class _GridPainter extends CustomPainter {
   bool shouldRepaint(_GridPainter old) =>
       old.rowHeight != rowHeight ||
       old.sliceCount != sliceCount ||
+      old.rowsPerBar != rowsPerBar ||
       !_sameSteps(old.steps, steps);
 
   static bool _sameSteps(List<int?> a, List<int?> b) {

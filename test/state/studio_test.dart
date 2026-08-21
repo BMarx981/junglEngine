@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:junglengine/features/library/break_library.dart';
 import 'package:junglengine/models/sub_lane.dart';
 import 'package:junglengine/state/studio.dart';
 
@@ -49,14 +50,20 @@ void main() {
   StudioState state() => container.read(studioProvider);
 
   group('boot', () {
-    test('opens on the bundled break at the break tempo', () {
-      expect(state().breakRef.id, 'hawkstreak-amenish-170');
-      expect(state().project.bpm, 170);
+    test('opens on the default bundled break at the break tempo', () {
+      expect(state().breakRef.id, BreakLibrary.defaultBreak.id);
+      expect(state().project.bpm, BreakLibrary.defaultBreak.bpm);
       expect(state().clip, isNotNull);
       expect(state().analysis, isNotNull);
     });
 
+    test('opens at 16 slices per bar', () {
+      expect(state().sliceDivision, 16);
+      expect(state().beat.sliceCount, 16 * state().breakBars);
+    });
+
     test('starts on the identity pattern, so play is the break itself', () {
+      // On a multi bar break the diagonal is its first bar; the grid is one bar.
       for (var step = 0; step < 16; step++) {
         expect(state().beat.chop.sliceAt(step), step);
       }
@@ -97,12 +104,26 @@ void main() {
     });
 
     test('re-slicing drops slices that no longer exist', () {
-      controller().setSliceCount(32);
-      controller().toggleCell(30, 2);
-      controller().setSliceCount(8);
-      expect(state().beat.sliceCount, 8);
+      final bars = state().breakBars;
+      controller().setSliceDivision(32);
+      expect(state().beat.sliceCount, 32 * bars);
+      controller().toggleCell(32 * bars - 1, 2);
+
+      controller().setSliceDivision(8);
+      expect(state().beat.sliceCount, 8 * bars);
+      expect(state().sliceDivision, 8);
       expect(state().beat.chop.sliceAt(2), isNull);
-      expect(state().analysis!.sliceCount, 8);
+      expect(state().analysis!.sliceCount, 8 * bars);
+    });
+
+    // A sixteenth has to stay a sixteenth whatever the break's length, or a
+    // four bar break gets quarter note slices and cannot be chopped.
+    test('divisions are per bar, so 16 is always a sixteenth note', () {
+      controller().setSliceDivision(16);
+      final clip = state().clip!;
+      final sliceSeconds = clip.frames / clip.sampleRate / state().beat.sliceCount;
+      final sixteenth = 60 / state().project.bpm / 4;
+      expect(sliceSeconds, closeTo(sixteenth, 1e-4));
     });
   });
 

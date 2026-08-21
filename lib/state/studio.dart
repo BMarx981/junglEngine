@@ -62,6 +62,14 @@ class StudioState {
   /// M0 has exactly one Beat. The list is real so M1 can grow it.
   Beat get beat => project.firstBeat;
 
+  /// Bars in the project break, floored at one so a bad [BreakRef] cannot
+  /// divide by zero.
+  int get breakBars => breakRef.bars < 1 ? 1 : breakRef.bars;
+
+  /// The division the user picked, in slices per bar. [Beat.sliceCount] holds
+  /// the total across the break, which is what the mixer and the grid want.
+  int get sliceDivision => beat.sliceCount ~/ breakBars;
+
   bool get isReady => status == StudioStatus.ready && clip != null;
 
   StudioState copyWith({
@@ -107,7 +115,9 @@ class StudioController extends Notifier<StudioState> {
   }
 
   static Project _newProject(BreakRef breakRef) {
-    const sliceCount = 16;
+    const divisionsPerBar = 16;
+    final bars = breakRef.bars < 1 ? 1 : breakRef.bars;
+    final sliceCount = divisionsPerBar * bars;
     return Project(
       id: 'project-1',
       name: 'junglEngine',
@@ -121,7 +131,8 @@ class StudioController extends Notifier<StudioState> {
           bars: 1,
           sliceCount: sliceCount,
           // The diagonal, so the very first press of play is the break itself.
-          // Scramble is then heard against something, not against silence.
+          // On a multi bar break this is its first bar, since the grid is one
+          // bar. Scramble is then heard against something, not silence.
           chop: ChopPattern.identity(sliceCount: sliceCount),
         ),
       ],
@@ -206,7 +217,10 @@ class StudioController extends Notifier<StudioState> {
     _commit(beat.copyWith(chop: beat.chop.cleared()), undoable: true);
   }
 
-  void setSliceCount(int count) {
+  /// [divisionsPerBar] is one of [allowedSliceDivisions]. The break's bar count
+  /// turns that into the total number of slices.
+  void setSliceDivision(int divisionsPerBar) {
+    final count = divisionsPerBar * state.breakBars;
     final beat = state.beat;
     if (beat.sliceCount == count) return;
     final clip = state.clip;

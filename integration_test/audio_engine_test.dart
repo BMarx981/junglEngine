@@ -27,13 +27,15 @@ void main() {
   Future<RenderSpec> loadedSpec({double bpm = 170}) async {
     final ref = BreakLibrary.defaultBreak;
     final clip = await BreakLibrary.load(ref, engine.sampleRate);
+    // Divisions are per bar, matching what the app opens with.
+    final sliceCount = 16 * ref.bars;
     return RenderSpec(
       breakClip: clip,
       beat: Beat(
         id: 'b',
         name: 'A',
-        sliceCount: 16,
-        chop: ChopPattern.identity(sliceCount: 16),
+        sliceCount: sliceCount,
+        chop: ChopPattern.identity(sliceCount: sliceCount),
         sub: SubLane.empty()
             .withStep(0, const SubStep(semitone: -5))
             .withStep(1, const SubStep(tie: true)),

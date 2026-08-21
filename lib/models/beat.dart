@@ -4,9 +4,15 @@ import 'steps.dart';
 import 'sub_lane.dart';
 import 'sub_patch.dart';
 
-/// Slice divisions offered by the Chop machine. Equal division only in M0;
-/// transient detection is a separate future feature.
-const List<int> allowedSliceCounts = [8, 16, 32];
+/// Slice divisions offered by the Chop machine, **per bar of the break**.
+///
+/// Per bar rather than per break, because that is the only reading where the
+/// numbers mean note values: 16 is always a sixteenth note, whether the break
+/// is one bar or four. Dividing a four bar break into 16 would give quarter
+/// notes, which cannot chop.
+///
+/// Equal division only in M0; transient detection is a separate future feature.
+const List<int> allowedSliceDivisions = [8, 16, 32];
 
 /// One pattern's worth of music: a drum grid plus the sub lane.
 ///
@@ -31,7 +37,9 @@ class Beat {
   final MachineType machineType;
   final int bars;
 
-  /// Equal divisions of the project break. Chop machine only.
+  /// Total equal divisions of the project break, across all of its bars. The
+  /// user picks a per bar division from [allowedSliceDivisions] and this is
+  /// that multiplied by the break's bar count. Chop machine only.
   final int sliceCount;
 
   /// The break step grid. Empty and unused on a Kit Beat.

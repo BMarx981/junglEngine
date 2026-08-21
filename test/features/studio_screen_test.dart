@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:junglengine/features/bass/sub_lane_view.dart';
 import 'package:junglengine/features/grid/chop_grid.dart';
+import 'package:junglengine/features/library/break_library.dart';
 import 'package:junglengine/features/studio_screen.dart';
 import 'package:junglengine/features/transport/action_bar.dart';
 import 'package:junglengine/features/transport/transport_bar.dart';
@@ -90,11 +91,14 @@ void main() {
   ) async {
     final engine = await pumpStudio(tester);
 
+    final sliceCount = engine.lastSpec!.beat.sliceCount;
     final grid = tester.getRect(find.byType(ChopGrid));
     final cellsLeft = grid.left + ChopGrid.gutterWidth;
     final cellWidth = (grid.width - ChopGrid.gutterWidth) / 16;
-    final rowHeight =
-        (grid.height / 16).clamp(ChopGrid.minRowHeight, ChopGrid.maxRowHeight);
+    final rowHeight = (grid.height / sliceCount).clamp(
+      ChopGrid.minRowHeight,
+      ChopGrid.maxRowHeight,
+    );
 
     // Row 2, step 5. The identity pattern has slice 5 there, so this is a real
     // change.
@@ -109,16 +113,22 @@ void main() {
 
   testWidgets('changing the slice division re-slices the grid', (tester) async {
     final engine = await pumpStudio(tester);
+    // Divisions are per bar, so the total scales with the break's length.
+    final bars = BreakLibrary.defaultBreak.bars;
 
     await tester.tap(inTransportBar('32'));
     await tester.pump();
-    expect(engine.lastSpec!.beat.sliceCount, 32);
+    expect(engine.lastSpec!.beat.sliceCount, 32 * bars);
 
     await tester.tap(inTransportBar('8'));
     await tester.pump();
-    expect(engine.lastSpec!.beat.sliceCount, 8);
-    // Slices 8..15 from the identity pattern no longer exist.
-    expect(engine.lastSpec!.beat.chop.sliceAt(12), isNull);
+    expect(engine.lastSpec!.beat.sliceCount, 8 * bars);
+
+    // The identity pattern reached slice 15, which no longer exists on a one
+    // bar break at 8 divisions.
+    if (8 * bars <= 15) {
+      expect(engine.lastSpec!.beat.chop.sliceAt(12), isNull);
+    }
   });
 
   testWidgets('dragging a sub lane column writes a pitch', (tester) async {

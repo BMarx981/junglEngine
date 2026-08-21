@@ -15,6 +15,14 @@ class BreakLibrary {
 
   static const List<BreakRef> bundled = [
     BreakRef(
+      id: 'dnb-full02-170',
+      name: 'DnB Full 02',
+      assetPath: 'assets/breaks/DnB_full02_loop_170.wav',
+      bpm: 170,
+      bars: 4,
+      credit: 'Provenance not yet recorded. See LICENSING.md.',
+    ),
+    BreakRef(
       id: 'hawkstreak-amenish-170',
       name: 'Amenish',
       assetPath: 'assets/breaks/hawkstreak_amenish_170.wav',

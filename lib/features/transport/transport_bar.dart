@@ -72,7 +72,7 @@ class TransportBar extends ConsumerWidget {
             children: [
               const _BpmControl(),
               const SizedBox(width: 14),
-              Expanded(child: _SliceSelector(sliceCount: state.beat.sliceCount)),
+              Expanded(child: _SliceSelector(division: state.sliceDivision)),
             ],
           ),
         ],
@@ -130,9 +130,10 @@ class _BpmControlState extends ConsumerState<_BpmControl> {
 }
 
 class _SliceSelector extends ConsumerWidget {
-  const _SliceSelector({required this.sliceCount});
+  const _SliceSelector({required this.division});
 
-  final int sliceCount;
+  /// Slices per bar, not slices in total. See [allowedSliceDivisions].
+  final int division;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -144,14 +145,14 @@ class _SliceSelector extends ConsumerWidget {
         const SizedBox(height: 3),
         Row(
           children: [
-            for (final count in allowedSliceCounts)
+            for (final count in allowedSliceDivisions)
               Padding(
                 padding: const EdgeInsets.only(right: 6),
                 child: _SliceChip(
                   count: count,
-                  selected: count == sliceCount,
+                  selected: count == division,
                   onTap: () =>
-                      ref.read(studioProvider.notifier).setSliceCount(count),
+                      ref.read(studioProvider.notifier).setSliceDivision(count),
                 ),
               ),
           ],
