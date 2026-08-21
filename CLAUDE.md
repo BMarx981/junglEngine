@@ -44,7 +44,6 @@ Monophonic. Sine or triangle core, one lowpass, drive, amp envelope, glide. Five
 
 - Direct file edits only. Never write Python scripts to modify files.
 - Brian is the only one who commits. Never run git commit, git merge, or git push. Creating branches and making file edits is fine, but stop at the commit boundary and hand off. This is a hard rule with no exceptions.
-- Branch per unit of work. A unit is done when it is demoable and ready for Brian to review and commit.
 - Every milestone has a go/no-go gate defined in MILESTONES.md. Do not start the next milestone before the gate is called.
 - No placeholder screens for future features. Ship surface area only.
 - Bundled breaks must be cleared for licensing before any store submission. Track this in a LICENSING.md when the first pack is added.

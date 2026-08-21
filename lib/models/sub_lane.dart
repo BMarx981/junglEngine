@@ -77,10 +77,19 @@ class SubLane {
 
   List<Object?> toJson() => [for (final s in steps) s.toJson()];
 
-  static SubLane fromJson(Object? json) {
-    if (json is! List) return SubLane.empty();
+  /// Always comes back at exactly [bars] bars, so the lane and the Beat's
+  /// timeline can never disagree.
+  static SubLane fromJson(Object? json, {int bars = 1}) {
+    final total = bars * stepsPerBar;
+    if (json is! List) return SubLane.empty(bars: bars);
     return SubLane(
-      List<SubStep>.unmodifiable([for (final v in json) SubStep.fromJson(v)]),
+      List<SubStep>.unmodifiable([
+        for (var i = 0; i < total; i++)
+          if (i < json.length)
+            SubStep.fromJson(json[i])
+          else
+            const SubStep.rest(),
+      ]),
     );
   }
 }

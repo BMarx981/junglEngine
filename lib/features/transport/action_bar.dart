@@ -17,6 +17,10 @@ class ActionBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(studioProvider.notifier);
     final canUndo = ref.watch(studioProvider.select((s) => s.canUndo));
+    // Scramble rearranges slices of a break. A Kit Beat has no slices, and the
+    // M1 gate is about whether the Kit machine earns its place, not about
+    // inventing a second meaning for the button.
+    final isKit = ref.watch(studioProvider.select((s) => s.beat.isKit));
     final transport = ref.watch(transportProvider);
 
     return Container(
@@ -42,6 +46,7 @@ class ActionBar extends ConsumerWidget {
             child: _Action(
               icon: Icons.shuffle,
               label: 'SCRAMBLE',
+              enabled: !isKit,
               color: JungleTheme.hot,
               onTap: () {
                 HapticFeedback.selectionClick();

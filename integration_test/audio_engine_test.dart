@@ -12,8 +12,11 @@ import 'package:integration_test/integration_test.dart';
 import 'package:junglengine/audio/pattern_renderer.dart';
 import 'package:junglengine/audio/soloud_engine.dart';
 import 'package:junglengine/features/library/break_library.dart';
+import 'package:junglengine/features/library/kit_library.dart';
 import 'package:junglengine/models/beat.dart';
 import 'package:junglengine/models/chop_pattern.dart';
+import 'package:junglengine/models/kit_pattern.dart';
+import 'package:junglengine/models/machine_type.dart';
 import 'package:junglengine/models/sub_lane.dart';
 
 void main() {
@@ -166,6 +169,72 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 250));
 
     expect(engine.transport.value.playing, isTrue);
+    await engine.stop();
+  });
+
+  Future<RenderSpec> loadedKitSpec({double bpm = 170}) async {
+    final breakRef = BreakLibrary.defaultBreak;
+    final kitRef = KitLibrary.defaultKit;
+    return RenderSpec(
+      breakClip: await BreakLibrary.load(breakRef, engine.sampleRate),
+      kitClips: await KitLibrary.load(kitRef, engine.sampleRate),
+      beat: Beat(
+        id: 'k',
+        name: 'B',
+        machineType: MachineType.kit,
+        kit: KitPattern.starter(),
+        sub: SubLane.empty().withStep(0, const SubStep(semitone: -5)),
+      ),
+      bpm: bpm,
+      sampleRate: engine.sampleRate,
+    );
+  }
+
+  testWidgets('a Kit Beat plays on a real device too', (tester) async {
+    await engine.initialize();
+    await engine.setSpec(await loadedKitSpec());
+    await engine.start();
+
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final early = engine.transport.value;
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    final later = engine.transport.value;
+
+    expect(early.loopPosition, greaterThan(0.05));
+    expect(later.loopPosition, greaterThan(early.loopPosition));
+
+    await engine.stop();
+  });
+
+  testWidgets('auditioning a kit slot does not disturb the transport', (
+    tester,
+  ) async {
+    await engine.initialize();
+    await engine.setSpec(await loadedKitSpec());
+    await engine.start();
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
+    await engine.auditionKitSlot(0);
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+
+    expect(engine.transport.value.playing, isTrue);
+    await engine.stop();
+  });
+
+  testWidgets('switching machine while playing keeps playing', (tester) async {
+    await engine.initialize();
+    await engine.setSpec(await loadedSpec());
+    await engine.start();
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
+    // A different Beat, and a different machine: the renderer is rebuilt and
+    // the stream restarted underneath a transport that must stay running.
+    await engine.setSpec(await loadedKitSpec());
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+
+    expect(engine.transport.value.playing, isTrue);
+    expect(engine.transport.value.loopPosition, greaterThan(0.0));
+
     await engine.stop();
   });
 }

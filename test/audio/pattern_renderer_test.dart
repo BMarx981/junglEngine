@@ -6,6 +6,9 @@ import 'package:junglengine/audio/pattern_renderer.dart';
 import 'package:junglengine/audio/soloud_engine.dart';
 import 'package:junglengine/models/beat.dart';
 import 'package:junglengine/models/chop_pattern.dart';
+import 'package:junglengine/models/kit_pattern.dart';
+import 'package:junglengine/models/kit_slot.dart';
+import 'package:junglengine/models/machine_type.dart';
 import 'package:junglengine/models/sub_lane.dart';
 import 'package:junglengine/models/sub_patch.dart';
 
@@ -34,6 +37,44 @@ RenderSpec specFor(Beat beat, {double tempo = bpm, AudioClip? clip}) =>
       bpm: tempo,
       sampleRate: sampleRate,
     );
+
+/// Two flat kit clips at different levels, so a rendered block says plainly
+/// which slot fired. Everything past slot 1 is silence.
+List<AudioClip> testKit() {
+  AudioClip flat(double value) {
+    const frames = 4410;
+    return AudioClip(
+      samples: Float32List(frames * 2)..fillRange(0, frames * 2, value),
+      channels: 2,
+      sampleRate: sampleRate,
+    );
+  }
+
+  return [
+    flat(0.5),
+    flat(0.25),
+    for (var i = 2; i < kitSlotCount; i++) flat(0),
+  ];
+}
+
+Beat kitBeat({required KitPattern kit, List<KitSlot>? slots, SubLane? sub}) =>
+    Beat(
+      id: 'k',
+      name: 'K',
+      machineType: MachineType.kit,
+      sliceCount: sliceCount,
+      kit: kit,
+      kitSlots: slots,
+      sub: sub ?? SubLane.empty(),
+    );
+
+RenderSpec kitSpec(Beat beat, [List<AudioClip>? clips]) => RenderSpec(
+  breakClip: testBreak(),
+  kitClips: clips ?? testKit(),
+  beat: beat,
+  bpm: bpm,
+  sampleRate: sampleRate,
+);
 
 Beat beatWith({ChopPattern? chop, SubLane? sub, SubPatch? patch}) => Beat(
   id: 'b',
@@ -85,9 +126,7 @@ void main() {
     });
 
     test('a painted step plays the slice that was painted', () {
-      final spec = specFor(
-        beatWith(chop: ChopPattern.empty().withStep(0, 5)),
-      );
+      final spec = specFor(beatWith(chop: ChopPattern.empty().withStep(0, 5)));
       final renderer = PatternRenderer(spec);
       final stepFrames = renderer.loopFrames ~/ 16;
       final out = Float32List(stepFrames * 2);
@@ -120,9 +159,7 @@ void main() {
 
     test('the grid is monophonic: a new hit chokes the last one', () {
       final spec = specFor(
-        beatWith(
-          chop: ChopPattern.empty().withStep(0, 15).withStep(1, 0),
-        ),
+        beatWith(chop: ChopPattern.empty().withStep(0, 15).withStep(1, 0)),
       );
       final renderer = PatternRenderer(spec);
       final stepFrames = renderer.loopFrames ~/ 16;
@@ -302,6 +339,153 @@ void main() {
       final offline = renderPatternOffline(spec, frames);
       // The last note's tail has to be audible at the top of the file.
       expect(offline[0].abs() + offline[200].abs(), greaterThan(0.0001));
+    });
+  });
+
+  group('kit playback', () {
+    test('an empty kit is silent', () {
+      final out = renderAll(kitSpec(kitBeat(kit: KitPattern.empty())), 20000);
+      expect(peakOf(out), 0);
+    });
+
+    test('a placed hit plays that slot at that step', () {
+      final spec = kitSpec(
+        kitBeat(kit: KitPattern.empty().withCell(0, 0, KitVelocity.hard)),
+      );
+      final renderer = PatternRenderer(spec);
+      final stepFrames = renderer.loopFrames ~/ 16;
+      final out = Float32List(stepFrames * 2 * 2);
+      renderer.render(out, stepFrames * 2);
+
+      // Slot 0's clip is flat, so the level says which slot fired.
+      const expected = 0.5 * 0.8 * 1.0 * 0.92;
+      expect(out[100 * 2], closeTo(PatternRenderer.softClip(expected), 1e-4));
+      // One shots ring past the step boundary rather than being cut at it, so
+      // the check for "nothing else fired" is past the end of the clip.
+      expect(out[5000 * 2].abs(), lessThan(1e-6));
+    });
+
+    test('velocity scales the hit', () {
+      double levelOf(KitVelocity velocity) {
+        final out = renderAll(
+          kitSpec(kitBeat(kit: KitPattern.empty().withCell(0, 0, velocity))),
+          2000,
+        );
+        return out[100 * 2];
+      }
+
+      final hard = levelOf(KitVelocity.hard);
+      final medium = levelOf(KitVelocity.medium);
+      final soft = levelOf(KitVelocity.soft);
+      expect(medium, lessThan(hard));
+      expect(soft, lessThan(medium));
+      expect(soft / hard, closeTo(KitVelocity.soft.gain, 0.02));
+    });
+
+    test('slots are independent: two on one step both sound', () {
+      final one = renderAll(
+        kitSpec(
+          kitBeat(kit: KitPattern.empty().withCell(0, 0, KitVelocity.hard)),
+        ),
+        2000,
+      );
+      final both = renderAll(
+        kitSpec(
+          kitBeat(
+            kit: KitPattern.empty()
+                .withCell(0, 0, KitVelocity.hard)
+                .withCell(1, 0, KitVelocity.hard),
+          ),
+        ),
+        2000,
+      );
+      expect(both[100 * 2], greaterThan(one[100 * 2]));
+    });
+
+    test('slot volume turns a slot down', () {
+      final quiet = renderAll(
+        kitSpec(
+          kitBeat(
+            kit: KitPattern.empty().withCell(0, 0, KitVelocity.hard),
+            slots: [
+              const KitSlot(volume: 0.2),
+              ...KitSlot.defaults(kitSlotCount - 1),
+            ],
+          ),
+        ),
+        2000,
+      );
+      expect(
+        quiet[100 * 2],
+        closeTo(PatternRenderer.softClip(0.5 * 0.2 * 0.92), 1e-4),
+      );
+    });
+
+    test('pitching a slot down makes it ring longer', () {
+      Float32List render(int pitch) => renderAll(
+        kitSpec(
+          kitBeat(
+            kit: KitPattern.empty().withCell(0, 0, KitVelocity.hard),
+            slots: [
+              KitSlot(pitch: pitch),
+              ...KitSlot.defaults(kitSlotCount - 1),
+            ],
+          ),
+        ),
+        7000,
+      );
+
+      // The slot's clip is 4410 frames at unity. An octave down reads it at
+      // half speed, so it is still playing where the untouched slot has ended.
+      expect(render(0)[6000 * 2].abs(), lessThan(1e-6));
+      expect(render(-12)[6000 * 2].abs(), greaterThan(0.01));
+    });
+
+    test('a Kit Beat ignores whatever is on its chop grid', () {
+      final beat = Beat(
+        id: 'k',
+        name: 'K',
+        machineType: MachineType.kit,
+        sliceCount: sliceCount,
+        chop: ChopPattern.identity(sliceCount: sliceCount),
+        kit: KitPattern.empty(),
+      );
+      expect(peakOf(renderAll(kitSpec(beat), 20000)), 0);
+    });
+
+    test('a Chop Beat ignores whatever is on its kit grid', () {
+      final beat = beatWith();
+      final spec = RenderSpec(
+        breakClip: testBreak(),
+        kitClips: testKit(),
+        beat: beat.copyWith(
+          kit: KitPattern.empty().withCell(0, 0, KitVelocity.hard),
+        ),
+        bpm: bpm,
+        sampleRate: sampleRate,
+      );
+      expect(peakOf(renderAll(spec, 20000)), 0);
+    });
+
+    test('the sub lane plays under the Kit machine too', () {
+      final out = renderAll(
+        kitSpec(
+          kitBeat(
+            kit: KitPattern.empty(),
+            sub: SubLane.empty().withStep(0, const SubStep(semitone: 0)),
+          ),
+        ),
+        20000,
+      );
+      expect(peakOf(out), greaterThan(0.01));
+    });
+
+    test('two renders of the same kit spec are sample identical', () {
+      final clips = testKit();
+      final beat = kitBeat(kit: KitPattern.starter());
+      final a = renderAll(kitSpec(beat, clips), 40000);
+      final b = renderAll(kitSpec(beat, clips), 40000);
+      expect(a, equals(b));
     });
   });
 }

@@ -5,13 +5,17 @@ import '../state/studio.dart';
 import '../theme.dart';
 import 'bass/sub_lane_view.dart';
 import 'grid/chop_grid.dart';
+import 'kit/kit_grid.dart';
+import 'song/beat_bar.dart';
 import 'transport/action_bar.dart';
+import 'transport/bar_strip.dart';
 import 'transport/transport_bar.dart';
 
 /// The only screen there is.
 ///
-/// Load break, slice, paint, loop, export. No settings, no onboarding, no
-/// navigation. If something wants a second screen in M0, it does not ship.
+/// Load break, pick a machine, paint, loop, export. No settings, no onboarding,
+/// no navigation: the beat bank swaps what the grid is showing, it does not
+/// push a page.
 class StudioScreen extends ConsumerWidget {
   const StudioScreen({super.key});
 
@@ -36,27 +40,36 @@ class StudioScreen extends ConsumerWidget {
   }
 }
 
-class _Studio extends StatelessWidget {
+class _Studio extends ConsumerWidget {
   const _Studio();
 
   @override
-  Widget build(BuildContext context) {
-    return const Column(
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Which machine the open Beat runs decides the grid, and nothing else on
+    // the screen. Transport, sub lane and export are shared by both.
+    final isKit = ref.watch(studioProvider.select((s) => s.beat.isKit));
+
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TransportBar(),
+        const TransportBar(),
+        const BeatBar(),
         Expanded(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(8, 8, 8, 4),
-            child: ChopGrid(),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+            child: isKit ? const KitGrid() : const ChopGrid(),
           ),
         ),
-        Padding(
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 8),
+          child: BarStrip(),
+        ),
+        const Padding(
           padding: EdgeInsets.symmetric(horizontal: 8),
           child: SubLaneView(),
         ),
-        SizedBox(height: 6),
-        ActionBar(),
+        const SizedBox(height: 6),
+        const ActionBar(),
       ],
     );
   }

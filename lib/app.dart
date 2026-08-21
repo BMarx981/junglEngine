@@ -33,6 +33,9 @@ class _JungleAppState extends ConsumerState<JungleApp>
     if (lifecycle == AppLifecycleState.paused ||
         lifecycle == AppLifecycleState.detached) {
       ref.read(audioEngineProvider).stop();
+      // Backgrounding is the last moment there reliably is: the OS can kill the
+      // app from the switcher without another callback.
+      ref.read(studioProvider.notifier).flushSave();
     }
   }
 

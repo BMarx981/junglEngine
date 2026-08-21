@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/steps.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
 import '../transport/playhead_painter.dart';
@@ -11,6 +12,10 @@ import 'slice_analysis.dart';
 /// Tap a cell to place a slice, tap it again to clear it. Drag sideways to
 /// paint a run. Vertical drags scroll, which is why painting is horizontal
 /// only: the two gestures never fight.
+///
+/// One bar at a time, always sixteen columns wide. A longer Beat is paged with
+/// the bar strip rather than squeezed, because a cell you cannot hit is not a
+/// cell.
 class ChopGrid extends ConsumerStatefulWidget {
   const ChopGrid({super.key});
 
@@ -31,6 +36,7 @@ class _ChopGridState extends ConsumerState<ChopGrid> {
     final state = ref.watch(studioProvider);
     final beat = state.beat;
     final transport = ref.watch(transportProvider);
+    final windowStart = state.windowStart;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -42,7 +48,7 @@ class _ChopGridState extends ConsumerState<ChopGrid> {
         );
         final gridHeight = rowHeight * beat.sliceCount;
         final cellWidth =
-            (constraints.maxWidth - ChopGrid.gutterWidth) / beat.stepCount;
+            (constraints.maxWidth - ChopGrid.gutterWidth) / stepsPerBar;
 
         return SingleChildScrollView(
           child: SizedBox(
@@ -85,7 +91,10 @@ class _ChopGridState extends ConsumerState<ChopGrid> {
                       children: [
                         CustomPaint(
                           painter: _GridPainter(
-                            steps: beat.chop.steps,
+                            steps: [
+                              for (var i = 0; i < stepsPerBar; i++)
+                                beat.chop.sliceAt(windowStart + i),
+                            ],
                             sliceCount: beat.sliceCount,
                             rowHeight: rowHeight,
                             rowsPerBar: state.sliceDivision,
@@ -94,7 +103,9 @@ class _ChopGridState extends ConsumerState<ChopGrid> {
                         CustomPaint(
                           painter: PlayheadPainter(
                             transport: transport,
-                            stepCount: beat.stepCount,
+                            visibleSteps: stepsPerBar,
+                            totalSteps: beat.stepCount,
+                            stepOffset: windowStart,
                           ),
                         ),
                       ],
@@ -118,18 +129,20 @@ class _ChopGridState extends ConsumerState<ChopGrid> {
     });
   }
 
+  /// Resolves a touch to a slice and a step of the whole pattern, not of the
+  /// bar on screen.
   void _cellAt(
     Offset position,
     double cellWidth,
     double rowHeight,
     void Function(int slice, int step) action,
   ) {
-    final beat = ref.read(studioProvider).beat;
-    final step = (position.dx / cellWidth).floor();
+    final state = ref.read(studioProvider);
+    final column = (position.dx / cellWidth).floor();
     final slice = (position.dy / rowHeight).floor();
-    if (step < 0 || step >= beat.stepCount) return;
-    if (slice < 0 || slice >= beat.sliceCount) return;
-    action(slice, step);
+    if (column < 0 || column >= stepsPerBar) return;
+    if (slice < 0 || slice >= state.beat.sliceCount) return;
+    action(slice, state.windowStart + column);
   }
 }
 
@@ -210,7 +223,9 @@ class _GridPainter extends CustomPainter {
     required this.rowsPerBar,
   });
 
+  /// The bar on screen: one entry per column.
   final List<int?> steps;
+
   final int sliceCount;
   final double rowHeight;
 

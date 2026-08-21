@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../models/beat.dart';
+import '../models/kit_pattern.dart';
 import 'audio_clip.dart';
 import 'sub_voice.dart';
 
@@ -12,12 +13,18 @@ class RenderSpec {
     required this.beat,
     required this.bpm,
     required this.sampleRate,
+    this.kitClips = const [],
     this.drumGain = 0.92,
     this.subGain = 0.80,
   });
 
   /// Stereo, already at [sampleRate].
   final AudioClip breakClip;
+
+  /// One clip per Kit slot, in slot order. Empty until the project kit has
+  /// loaded, which only silences Kit Beats.
+  final List<AudioClip> kitClips;
+
   final Beat beat;
   final double bpm;
   final int sampleRate;
@@ -31,6 +38,10 @@ class RenderSpec {
 /// blocks from it and pushes them to the output device; WAV export pulls the
 /// same blocks into a file. There is deliberately no second code path, so what
 /// you hear is exactly what you export.
+///
+/// Both machines render here. Which one a Beat runs is a branch at step fire
+/// time, not a second renderer, so the sub lane, the tempo handling and the
+/// master saturation are shared by construction.
 class PatternRenderer {
   PatternRenderer(this._spec) {
     _sub = SubVoice(sampleRate: _spec.sampleRate);
@@ -49,13 +60,14 @@ class PatternRenderer {
   /// that is currently ringing, so painting a step never interrupts the loop.
   ///
   /// Only valid while the timeline is unchanged. Anything that moves step
-  /// boundaries (tempo, bar count, a different break) needs a new renderer.
+  /// boundaries (tempo, bar count, a different Beat) needs a new renderer.
   void updateSpec(RenderSpec next) {
     assert(
       next.sampleRate == _spec.sampleRate &&
           next.beat.stepCount == _spec.beat.stepCount &&
+          next.beat.machineType == _spec.beat.machineType &&
           identical(next.breakClip, _spec.breakClip),
-      'updateSpec cannot change sample rate, length or break; '
+      'updateSpec cannot change sample rate, length, machine or break; '
       'build a new renderer instead',
     );
     if (next.bpm != _spec.bpm) _retempo(next.bpm);
@@ -79,6 +91,10 @@ class PatternRenderer {
 
   static const int _maxSliceVoices = 4;
 
+  /// Kit voices. Eight slots can fire on one step and the tails of the step
+  /// before are still ringing, so this is deliberately more than eight.
+  static const int _maxKitVoices = 16;
+
   late final SubVoice _sub;
   late double _framesPerStep;
   late final int _fadeFrames;
@@ -87,6 +103,11 @@ class PatternRenderer {
   final List<_SliceVoice> _voices = List.generate(
     _maxSliceVoices,
     (_) => _SliceVoice(),
+  );
+
+  final List<_KitVoice> _kitVoices = List.generate(
+    _maxKitVoices,
+    (_) => _KitVoice(),
   );
 
   int _stepIndex = 0;
@@ -117,6 +138,10 @@ class PatternRenderer {
     _tail = false;
     for (final v in _voices) {
       v.active = false;
+    }
+    for (final v in _kitVoices) {
+      v.active = false;
+      v.clip = null;
     }
     _sub.reset();
     _framesToNextStep = _stepLength(0);
@@ -180,6 +205,26 @@ class PatternRenderer {
         }
       }
 
+      for (final v in _kitVoices) {
+        if (!v.active) continue;
+        final samples = v.clip!;
+        final index = v.position.floor();
+        if (index >= v.frames - 1) {
+          v.active = false;
+          v.clip = null;
+          continue;
+        }
+        // One shots are pitched by playback rate, so a slot tuned down is also
+        // a slot that rings longer. Interpolated, because a rate of 1.06 read
+        // without it is audibly grainy on a hat.
+        final t = v.position - index;
+        final a = index * 2;
+        final b = a + 2;
+        l += (samples[a] + (samples[b] - samples[a]) * t) * v.gain;
+        r += (samples[a + 1] + (samples[b + 1] - samples[a + 1]) * t) * v.gain;
+        v.position += v.rate;
+      }
+
       l *= drumGain;
       r *= drumGain;
 
@@ -204,8 +249,15 @@ class PatternRenderer {
     if (_tail) return;
     final beat = _spec.beat;
 
-    final slice = beat.chop.sliceAt(step);
-    if (slice != null) _triggerSlice(slice);
+    if (beat.isKit) {
+      for (var slot = 0; slot < kitSlotCount; slot++) {
+        final velocity = beat.kit.velocityAt(slot, step);
+        if (velocity != null) _triggerKit(beat, slot, velocity);
+      }
+    } else {
+      final slice = beat.chop.sliceAt(step);
+      if (slice != null) _triggerSlice(slice);
+    }
 
     final cell = beat.sub.stepAt(step);
     if (cell.semitone != null) {
@@ -247,6 +299,26 @@ class PatternRenderer {
       ..endFrame = end;
   }
 
+  /// Fires one Kit slot. Nothing is choked: slots are independent by spec, so
+  /// an open hat rings under the next closed hat exactly as it would on a
+  /// machine with no choke groups.
+  void _triggerKit(Beat beat, int slot, KitVelocity velocity) {
+    final clips = _spec.kitClips;
+    if (slot < 0 || slot >= clips.length) return;
+    final clip = clips[slot];
+    if (clip.frames < 2) return;
+
+    final settings = beat.slot(slot);
+    final voice = _freeKitVoice();
+    voice
+      ..active = true
+      ..clip = clip.samples
+      ..frames = clip.frames
+      ..position = 0
+      ..rate = settings.rate
+      ..gain = settings.volume * velocity.gain;
+  }
+
   /// Prefers an idle slot, otherwise steals the one closest to finishing.
   _SliceVoice _freeVoice() {
     for (final v in _voices) {
@@ -259,6 +331,19 @@ class PatternRenderer {
       }
     }
     return oldest;
+  }
+
+  /// Same rule as the slice pool: steal from whatever has least left to play,
+  /// which is the voice you are least likely to hear disappear.
+  _KitVoice _freeKitVoice() {
+    for (final v in _kitVoices) {
+      if (!v.active) return v;
+    }
+    var nearest = _kitVoices.first;
+    for (final v in _kitVoices) {
+      if (v.remaining < nearest.remaining) nearest = v;
+    }
+    return nearest;
   }
 
   /// Gentle saturation on the master so a dense pattern glues instead of
@@ -282,4 +367,19 @@ class _SliceVoice {
   int endFrame = 0;
   double gain = 1;
   double fadeStep = 0;
+}
+
+class _KitVoice {
+  bool active = false;
+
+  /// Interleaved stereo samples of the slot's one shot, held directly so the
+  /// inner loop never goes through an object.
+  Float32List? clip;
+  int frames = 0;
+  double position = 0;
+  double rate = 1;
+  double gain = 1;
+
+  /// Frames of audio left to play, at this voice's rate.
+  double get remaining => active ? (frames - position) / rate : -1;
 }

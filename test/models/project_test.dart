@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:junglengine/models/beat.dart';
 import 'package:junglengine/models/chop_pattern.dart';
+import 'package:junglengine/models/kit_pattern.dart';
 import 'package:junglengine/models/machine_type.dart';
 import 'package:junglengine/models/project.dart';
 import 'package:junglengine/models/song.dart';
@@ -14,6 +15,7 @@ void main() {
         id: 'p1',
         name: 'test',
         breakId: 'hawkstreak-amenish-170',
+        kitId: 'hawkstreak-01',
         bpm: 174,
         beats: [
           Beat(
@@ -50,6 +52,7 @@ void main() {
         id: 'p1',
         name: 'test',
         breakId: 'b',
+        kitId: 'hawkstreak-01',
         bpm: 170,
         beats: [
           Beat(id: 'chop', name: 'A', machineType: MachineType.chop),
@@ -85,10 +88,13 @@ void main() {
       expect(pattern.sliceAt(2), isNull);
     });
 
-    test('tapping a different row replaces, because the grid is monophonic', () {
-      final pattern = ChopPattern.empty().toggled(2, 7).toggled(2, 3);
-      expect(pattern.sliceAt(2), 3);
-    });
+    test(
+      'tapping a different row replaces, because the grid is monophonic',
+      () {
+        final pattern = ChopPattern.empty().toggled(2, 7).toggled(2, 3);
+        expect(pattern.sliceAt(2), 3);
+      },
+    );
 
     test('re-slicing drops slices that no longer exist', () {
       final pattern = ChopPattern.identity(sliceCount: 32).clampedTo(8);
@@ -118,6 +124,126 @@ void main() {
       const patch = SubPatch();
       expect(patch.withParameter(1, 4).cutoff, 1.0);
       expect(patch.withParameter(1, -2).cutoff, 0.0);
+    });
+  });
+
+  group('beat bank', () {
+    Project bank(List<Beat> beats, {Song song = const Song.empty()}) => Project(
+      id: 'p1',
+      name: 'test',
+      breakId: 'b',
+      kitId: 'k',
+      bpm: 170,
+      beats: beats,
+      song: song,
+    );
+
+    test('a new Beat goes on the end', () {
+      final project = bank([Beat(id: 'beat-1', name: 'A')]);
+      final grown = project.withNewBeat(Beat(id: 'beat-2', name: 'B'));
+      expect(grown.beats.map((b) => b.id), ['beat-1', 'beat-2']);
+    });
+
+    test('a duplicate lands next to what it came from', () {
+      final project = bank([
+        Beat(id: 'beat-1', name: 'A'),
+        Beat(id: 'beat-2', name: 'B'),
+      ]);
+      final grown = project.withBeatAfter(
+        'beat-1',
+        Beat(id: 'beat-3', name: 'C'),
+      );
+      expect(grown.beats.map((b) => b.id), ['beat-1', 'beat-3', 'beat-2']);
+    });
+
+    test('deleting a Beat takes its Song entries with it', () {
+      final project = bank(
+        [Beat(id: 'beat-1', name: 'A'), Beat(id: 'beat-2', name: 'B')],
+        song: const Song([
+          SongEntry(beatId: 'beat-1'),
+          SongEntry(beatId: 'beat-2', repeats: 4),
+          SongEntry(beatId: 'beat-1'),
+        ]),
+      );
+      final smaller = project.withoutBeat('beat-1');
+      expect(smaller.beats.map((b) => b.id), ['beat-2']);
+      expect(smaller.song.entries.map((e) => e.beatId), ['beat-2']);
+    });
+
+    test('the last Beat cannot be deleted: something is always open', () {
+      final project = bank([Beat(id: 'beat-1', name: 'A')]);
+      expect(project.withoutBeat('beat-1').beats, hasLength(1));
+    });
+
+    test('ids are unique among the Beats that exist', () {
+      var project = bank([
+        Beat(id: 'beat-1', name: 'A'),
+        Beat(id: 'beat-2', name: 'B'),
+      ]);
+      expect(project.nextBeatId(), 'beat-3');
+      project = project.withoutBeat('beat-2');
+      expect(project.nextBeatId(), 'beat-2');
+    });
+
+    test('names walk the alphabet and skip what is taken', () {
+      final project = bank([
+        Beat(id: 'beat-1', name: 'A'),
+        Beat(id: 'beat-2', name: 'C'),
+      ]);
+      expect(project.nextBeatName(), 'B');
+    });
+
+    test('a project of both machine types round trips', () {
+      final project = bank([
+        Beat(id: 'beat-1', name: 'A', bars: 2),
+        Beat(
+          id: 'beat-2',
+          name: 'B',
+          machineType: MachineType.kit,
+          bars: 4,
+          kit: KitPattern.starter(bars: 4),
+        ),
+      ]);
+      final restored = Project.fromJson(project.toJson());
+      expect(restored.kitId, 'k');
+      expect(restored.beatById('beat-1')!.bars, 2);
+      final kit = restored.beatById('beat-2')!;
+      expect(kit.machineType, MachineType.kit);
+      expect(kit.bars, 4);
+      expect(kit.kit.velocityAt(0, 0), isNotNull);
+    });
+
+    test('a version 1 file, from before Kit Beats, still opens', () {
+      // Exactly what M0 wrote: no kitId, no kit grid, no slots.
+      final restored = Project.fromJson({
+        'version': 1,
+        'id': 'p1',
+        'name': 'junglEngine',
+        'breakId': 'dnb-full02-170',
+        'bpm': 170.0,
+        'beats': [
+          {
+            'id': 'beat-1',
+            'name': 'A',
+            'machine': 'chop',
+            'bars': 1,
+            'sliceCount': 64,
+            'chop': [for (var i = 0; i < 16; i++) i],
+            'sub': [for (var i = 0; i < 16; i++) <String, Object?>{}],
+            'subPatch': const SubPatch().toJson(),
+            'subRootMidi': 36,
+          },
+        ],
+        'song': <Object?>[],
+      });
+
+      final beat = restored.beats.single;
+      expect(restored.breakId, 'dnb-full02-170');
+      expect(beat.chop.sliceAt(3), 3);
+      expect(beat.kit.isEmpty, isTrue);
+      expect(beat.kitSlots, hasLength(kitSlotCount));
+      // No kit means the default kit, not a broken reference.
+      expect(restored.kitId, '');
     });
   });
 }

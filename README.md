@@ -48,10 +48,45 @@ replace it at M2 or M3 without the grid, the sequencer or the exporter noticing.
 - `lib/audio/soloud_engine.dart` — flutter_soloud implementation
 - `lib/audio/sub_voice.dart` — the sub synth, all five parameters of it
 
+## Machines and Beats
+
+A project holds a bank of Beats. Each Beat picks its machine and its length when
+it is created, and neither changes afterwards, because both decide the shape of
+the pattern data underneath it.
+
+- **Chop** resequences the project break: rows are slices, columns are steps,
+  monophonic.
+- **Kit** plays the project kit: eight one shot slots, three velocity levels per
+  step, volume and pitch per slot, polyphonic across slots and no choke groups.
+
+Both carry the sub lane, both render through the same `PatternRenderer`, and the
+Song treats them identically. Duplicate is the workflow the bank is built for:
+make one, copy it, change two things.
+
+A Beat is 1, 2, 4 or 8 bars. The grid always shows one bar of sixteen steps and
+the bar strip pages between them, following the playhead while the transport
+runs. Squeezing 128 steps across a phone would make cells nobody can hit.
+
+The open project is saved to the app documents directory as JSON, shortly after
+every edit and immediately when the app is backgrounded, and it reopens on
+launch. Local only: no cloud, no accounts, no project browser.
+
+## Kits
+
+`KitLibrary.bundled` lists what ships, and a kit is exactly eight samples.
+Slots are positional: slot *n* plays sample *n*, and a Beat's per slot volume
+and pitch hang off that position. One kit per project, like the break.
+
+The bundled kit is synthesised, not sampled, so it is guaranteed clear:
+
+```sh
+dart run tool/make_kit.dart
+```
+
 ## Breaks
 
 `BreakLibrary.bundled` lists what ships. The first entry is what a project
-opens with; there is no break picker in M0, one break per project.
+opens with; there is no break picker, one break per project.
 
 Slice divisions are **per bar**: picking 16 means sixteenth notes whether the
 break is one bar or four. So a four bar break at 16 divisions is 64 rows on the
@@ -75,6 +110,5 @@ dart run tool/make_break.dart
 
 ## Working rules
 
-Brian is the only one who commits. Branch per unit of work. Every milestone has
-a gate in MILESTONES.md and the next one does not start until the gate is
-called.
+Brian is the only one who commits. Every milestone has a gate in MILESTONES.md
+and the next one does not start until the gate is called.

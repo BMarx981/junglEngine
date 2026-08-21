@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/steps.dart';
 import '../../models/sub_lane.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
@@ -12,6 +13,9 @@ import 'note_names.dart';
 /// Drag a column up and down to set its pitch. Tap a column that already has a
 /// note to clear it. The strip along the bottom ties a cell to the one before
 /// it, which is how you get glide.
+///
+/// It shows the same bar the drum grid above it is showing, so a bassline is
+/// always written against the drums it is under.
 class SubLaneView extends ConsumerStatefulWidget {
   const SubLaneView({super.key});
 
@@ -34,6 +38,7 @@ class _SubLaneViewState extends ConsumerState<SubLaneView> {
     final state = ref.watch(studioProvider);
     final beat = state.beat;
     final transport = ref.watch(transportProvider);
+    final windowStart = state.windowStart;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -43,8 +48,12 @@ class _SubLaneViewState extends ConsumerState<SubLaneView> {
           child: Row(
             children: [
               const SizedBox(width: 4),
-              Text('SUB', style: Theme.of(context).textTheme.labelSmall
-                  ?.copyWith(color: JungleTheme.sub)),
+              Text(
+                'SUB',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: JungleTheme.sub),
+              ),
               const Spacer(),
               Text(
                 _dragSemitone != null
@@ -64,11 +73,14 @@ class _SubLaneViewState extends ConsumerState<SubLaneView> {
           height: SubLaneView.pitchHeight,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final columnWidth = constraints.maxWidth / beat.stepCount;
+              final columnWidth = constraints.maxWidth / stepsPerBar;
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTapUp: (details) =>
-                    _onTap(details.localPosition, columnWidth, constraints.maxHeight),
+                onTapUp: (details) => _onTap(
+                  details.localPosition,
+                  columnWidth,
+                  constraints.maxHeight,
+                ),
                 onVerticalDragStart: (details) => _onDragStart(
                   details.localPosition,
                   columnWidth,
@@ -85,14 +97,24 @@ class _SubLaneViewState extends ConsumerState<SubLaneView> {
                   children: [
                     CustomPaint(
                       painter: _SubLanePainter(
-                        steps: beat.sub.steps,
-                        stepCount: beat.stepCount,
+                        steps: [
+                          for (var i = 0; i < stepsPerBar; i++)
+                            beat.sub.stepAt(windowStart + i),
+                        ],
+                        // The cell before the window, so a note tied across a
+                        // bar line is drawn gliding from where it really came
+                        // from rather than from the root.
+                        previous: windowStart > 0
+                            ? beat.sub.stepAt(windowStart - 1)
+                            : const SubStep.rest(),
                       ),
                     ),
                     CustomPaint(
                       painter: PlayheadPainter(
                         transport: transport,
-                        stepCount: beat.stepCount,
+                        visibleSteps: stepsPerBar,
+                        totalSteps: beat.stepCount,
+                        stepOffset: windowStart,
                         color: JungleTheme.sub,
                       ),
                     ),
@@ -102,13 +124,16 @@ class _SubLaneViewState extends ConsumerState<SubLaneView> {
             },
           ),
         ),
-        _TieStrip(lane: beat.sub, stepCount: beat.stepCount),
+        _TieStrip(lane: beat.sub, windowStart: windowStart),
       ],
     );
   }
 
-  int _stepAt(double dx, double columnWidth) =>
-      (dx / columnWidth).floor().clamp(0, ref.read(studioProvider).beat.stepCount - 1);
+  /// Column on screen to step of the whole pattern.
+  int _stepAt(double dx, double columnWidth) {
+    final column = (dx / columnWidth).floor().clamp(0, stepsPerBar - 1);
+    return ref.read(studioProvider).windowStart + column;
+  }
 
   /// Top of the lane is +12, bottom is -12.
   static int _semitoneAt(double dy, double height) {
@@ -154,10 +179,10 @@ class _SubLaneViewState extends ConsumerState<SubLaneView> {
 }
 
 class _TieStrip extends ConsumerWidget {
-  const _TieStrip({required this.lane, required this.stepCount});
+  const _TieStrip({required this.lane, required this.windowStart});
 
   final SubLane lane;
-  final int stepCount;
+  final int windowStart;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -165,34 +190,12 @@ class _TieStrip extends ConsumerWidget {
       height: SubLaneView.tieHeight,
       child: Row(
         children: [
-          for (var step = 0; step < stepCount; step++)
+          for (var column = 0; column < stepsPerBar; column++)
             Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: step == 0
-                    ? null
-                    : () => ref.read(studioProvider.notifier).toggleTie(step),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 1, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: lane.stepAt(step).tie
-                        ? JungleTheme.sub.withValues(alpha: 0.85)
-                        : JungleTheme.surface,
-                    borderRadius: BorderRadius.circular(2),
-                    border: Border.all(
-                      color: step % 4 == 0
-                          ? JungleTheme.line
-                          : JungleTheme.line.withValues(alpha: 0.4),
-                    ),
-                  ),
-                  child: lane.stepAt(step).tie
-                      ? const Icon(
-                          Icons.link,
-                          size: 11,
-                          color: JungleTheme.background,
-                        )
-                      : null,
-                ),
+              child: _TieCell(
+                step: windowStart + column,
+                column: column,
+                tied: lane.stepAt(windowStart + column).tie,
               ),
             ),
         ],
@@ -201,22 +204,65 @@ class _TieStrip extends ConsumerWidget {
   }
 }
 
-class _SubLanePainter extends CustomPainter {
-  _SubLanePainter({required this.steps, required this.stepCount});
+class _TieCell extends ConsumerWidget {
+  const _TieCell({
+    required this.step,
+    required this.column,
+    required this.tied,
+  });
 
+  final int step;
+  final int column;
+  final bool tied;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      // Step zero has nothing before it to glide from.
+      onTap: step == 0
+          ? null
+          : () => ref.read(studioProvider.notifier).toggleTie(step),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 1, vertical: 3),
+        decoration: BoxDecoration(
+          color: tied
+              ? JungleTheme.sub.withValues(alpha: 0.85)
+              : JungleTheme.surface,
+          borderRadius: BorderRadius.circular(2),
+          border: Border.all(
+            color: column % 4 == 0
+                ? JungleTheme.line
+                : JungleTheme.line.withValues(alpha: 0.4),
+          ),
+        ),
+        child: tied
+            ? const Icon(Icons.link, size: 11, color: JungleTheme.background)
+            : null,
+      ),
+    );
+  }
+}
+
+class _SubLanePainter extends CustomPainter {
+  _SubLanePainter({required this.steps, required this.previous});
+
+  /// The bar on screen.
   final List<SubStep> steps;
-  final int stepCount;
+
+  /// The cell immediately before it.
+  final SubStep previous;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final columnWidth = size.width / stepCount;
+    final columnWidth = size.width / steps.length;
     final range = (subMaxSemitone - subMinSemitone).toDouble();
 
     double yFor(int semitone) =>
         size.height * (1 - (semitone - subMinSemitone) / range);
 
     final shade = Paint()..color = JungleTheme.surface;
-    for (var step = 0; step < stepCount; step++) {
+    for (var step = 0; step < steps.length; step++) {
       if ((step ~/ 4).isEven) continue;
       canvas.drawRect(
         Rect.fromLTWH(step * columnWidth, 0, columnWidth, size.height),
@@ -239,10 +285,10 @@ class _SubLanePainter extends CustomPainter {
       ..color = JungleTheme.sub.withValues(alpha: 0.7)
       ..strokeWidth = 2;
 
-    var lastSemitone = 0;
-    var sounding = false;
+    var lastSemitone = previous.semitone ?? 0;
+    var sounding = !previous.isRest;
 
-    for (var step = 0; step < steps.length && step < stepCount; step++) {
+    for (var step = 0; step < steps.length; step++) {
       final cell = steps[step];
       final left = step * columnWidth;
 
@@ -278,7 +324,7 @@ class _SubLanePainter extends CustomPainter {
     final line = Paint()
       ..color = JungleTheme.line.withValues(alpha: 0.5)
       ..strokeWidth = 1;
-    for (var step = 0; step <= stepCount; step++) {
+    for (var step = 0; step <= steps.length; step++) {
       final x = step * columnWidth;
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), line);
     }
@@ -286,7 +332,9 @@ class _SubLanePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_SubLanePainter old) {
-    if (old.stepCount != stepCount || old.steps.length != steps.length) {
+    if (old.steps.length != steps.length ||
+        old.previous.semitone != previous.semitone ||
+        old.previous.tie != previous.tie) {
       return true;
     }
     for (var i = 0; i < steps.length; i++) {

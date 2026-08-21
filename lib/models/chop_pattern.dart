@@ -55,11 +55,16 @@ class ChopPattern {
 
   List<Object?> toJson() => steps;
 
-  static ChopPattern fromJson(Object? json) {
-    if (json is! List) return ChopPattern.empty();
+  /// Always comes back at exactly [bars] bars, whatever the file said. The
+  /// Beat's length is the truth; a pattern that disagreed with it would paint
+  /// steps the sequencer never reaches.
+  static ChopPattern fromJson(Object? json, {int bars = 1}) {
+    final total = bars * stepsPerBar;
+    if (json is! List) return ChopPattern.empty(bars: bars);
     return ChopPattern(
       List<int?>.unmodifiable([
-        for (final v in json) v is int ? v : null,
+        for (var i = 0; i < total; i++)
+          if (i < json.length && json[i] is int) json[i]! as int else null,
       ]),
     );
   }

@@ -79,6 +79,10 @@ abstract class AudioEngine {
   /// Never affects the transport.
   Future<void> auditionSlice(int sliceIndex);
 
+  /// Plays one Kit slot immediately, at that slot's own volume and pitch, for
+  /// tap feedback. Never affects the transport.
+  Future<void> auditionKitSlot(int slot);
+
   /// Renders [spec] faster than real time. Used by WAV export, which must
   /// produce byte identical audio to what playback produces, so export goes
   /// through the engine rather than around it.

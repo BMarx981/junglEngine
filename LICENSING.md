@@ -37,7 +37,25 @@ are per bar, so a wrong bar count makes every slice the wrong note value.
 
 ## One shot kits
 
-None yet. The Hawkstreak kit lands in M1 and is original content made in Reason.
+| ID | Files | Origin | Status |
+| --- | --- | --- | --- |
+| `hawkstreak-01` | `assets/kits/hawkstreak/hawkstreak_*.wav` (8 files) | Synthesised from scratch by `tool/make_kit.dart`. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
+
+### The M1 kit is synthesised, not the Reason kit
+
+MILESTONES.md calls for a Hawkstreak one shot kit made in Reason. What ships
+today is synthesised in Dart instead, for the same reason the placeholder break
+is: it is guaranteed clear and it exists now. It is a real kit, not a stub, and
+the Kit machine is finished either way.
+
+To swap in the Reason kit, drop eight WAVs into `assets/kits/hawkstreak/` under
+the same file names and delete nothing else. `KitLibrary` is positional, so slot
+order is file order: kick, snare, rim, clap, closed hat, open hat, shaker,
+conga. Update the Origin cell above when you do.
+
+To add a second kit: put its WAVs in `assets/kits/<name>/`, add a `KitRef` to
+`KitLibrary.bundled` with exactly eight samples, add the folder to `pubspec.yaml`
+under `assets:`, and add a row here.
 
 ## Checklist before any store submission
 

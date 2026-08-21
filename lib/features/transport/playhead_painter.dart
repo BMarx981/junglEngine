@@ -9,29 +9,50 @@ import '../../theme.dart';
 ///
 /// It reads the transport straight from the audio layer, which is the only
 /// thing that knows where playback actually is.
+///
+/// The grid shows one bar at a time while the pattern can be eight bars long,
+/// so this paints a window: [stepOffset] is the first step on screen and
+/// [visibleSteps] is how many fit. When the playhead is in a bar you are not
+/// looking at, nothing is drawn.
 class PlayheadPainter extends CustomPainter {
   PlayheadPainter({
     required this.transport,
-    required this.stepCount,
+    required this.visibleSteps,
+    required this.totalSteps,
+    this.stepOffset = 0,
     this.color = JungleTheme.accent,
   }) : super(repaint: transport);
 
   final ValueListenable<TransportState> transport;
-  final int stepCount;
+
+  /// Steps across the width of this painter.
+  final int visibleSteps;
+
+  /// Steps in the whole pattern.
+  final int totalSteps;
+
+  /// Which step of the pattern the left edge is.
+  final int stepOffset;
+
   final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
     final state = transport.value;
-    if (!state.playing) return;
-    final cellWidth = size.width / stepCount;
+    if (!state.playing || visibleSteps <= 0 || totalSteps <= 0) return;
+    final cellWidth = size.width / visibleSteps;
 
-    canvas.drawRect(
-      Rect.fromLTWH(state.step * cellWidth, 0, cellWidth, size.height),
-      Paint()..color = Colors.white.withValues(alpha: 0.11),
-    );
+    final step = state.step - stepOffset;
+    if (step >= 0 && step < visibleSteps) {
+      canvas.drawRect(
+        Rect.fromLTWH(step * cellWidth, 0, cellWidth, size.height),
+        Paint()..color = Colors.white.withValues(alpha: 0.11),
+      );
+    }
 
-    final x = state.loopPosition * size.width;
+    final position = state.loopPosition * totalSteps - stepOffset;
+    if (position < 0 || position > visibleSteps) return;
+    final x = position * cellWidth;
     canvas.drawLine(
       Offset(x, 0),
       Offset(x, size.height),
@@ -44,6 +65,8 @@ class PlayheadPainter extends CustomPainter {
   @override
   bool shouldRepaint(PlayheadPainter old) =>
       old.transport != transport ||
-      old.stepCount != stepCount ||
+      old.visibleSteps != visibleSteps ||
+      old.totalSteps != totalSteps ||
+      old.stepOffset != stepOffset ||
       old.color != color;
 }

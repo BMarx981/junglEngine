@@ -4,6 +4,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
 
+import '../models/kit_slot.dart';
 import 'audio_clip.dart';
 import 'engine.dart';
 import 'pattern_renderer.dart';
@@ -86,6 +87,14 @@ class SoLoudAudioEngine implements AudioEngine {
   Future<void>? _slicing;
   int _sliceGeneration = 0;
 
+  /// One AudioSource per Kit slot, for the same reason as the slice sources:
+  /// a pad has to sound the instant it is touched, not when the render queue
+  /// next comes round.
+  final List<AudioSource> _kitSources = [];
+  Object? _kitSourcesFor;
+  Future<void>? _kitLoading;
+  int _kitGeneration = 0;
+
   late final Float32List _block = Float32List(_blockFrames * 2);
   late final int _queueFrames = (sampleRate * _queueSeconds).round();
 
@@ -130,6 +139,7 @@ class SoLoudAudioEngine implements AudioEngine {
     _shuttingDown = true;
     await stop();
     await _disposeSliceSources();
+    await _disposeKitSources();
     if (_initialized) {
       await SoLoud.instance.disposeAllSources();
       SoLoud.instance.deinit();
@@ -161,13 +171,17 @@ class SoLoudAudioEngine implements AudioEngine {
       stepCount: spec.beat.stepCount,
     );
     unawaited(_ensureSliceSources());
+    unawaited(_ensureKitSources());
   }
 
-  /// Tempo is not in this list on purpose: the renderer retempos in place, so
-  /// dragging BPM slides the loop instead of restarting it.
+  /// Switching Beat moves everything: a different pattern, possibly a different
+  /// machine or length. Tempo is deliberately not in this list, because the
+  /// renderer retempos in place: dragging BPM slides the loop, never restarts it.
   static bool _needsFreshRenderer(RenderSpec? a, RenderSpec b) {
     if (a == null) return true;
-    return a.beat.bars != b.beat.bars || !identical(a.breakClip, b.breakClip);
+    return a.beat.id != b.beat.id ||
+        a.beat.bars != b.beat.bars ||
+        !identical(a.breakClip, b.breakClip);
   }
 
   @override
@@ -263,7 +277,8 @@ class SoLoudAudioEngine implements AudioEngine {
 
   /// Resolves the audible position from the marker covering [consumedFrames].
   void _publishPlayhead(int consumedFrames) {
-    while (_markers.length > 1 && _markers.elementAt(1).pushedFrame <= consumedFrames) {
+    while (_markers.length > 1 &&
+        _markers.elementAt(1).pushedFrame <= consumedFrames) {
       _markers.removeFirst();
     }
     if (_markers.isEmpty) return;
@@ -377,6 +392,70 @@ class SoLoudAudioEngine implements AudioEngine {
   }
 
   @override
+  Future<void> auditionKitSlot(int slot) async {
+    if (!_initialized) return;
+    await _ensureKitSources();
+    if (slot < 0 || slot >= _kitSources.length) return;
+    final settings = _spec?.beat.slot(slot) ?? const KitSlot();
+    // Started paused so the slot's tuning applies from the first sample instead
+    // of sliding into place after it.
+    final handle = SoLoud.instance.play(
+      _kitSources[slot],
+      volume: settings.volume,
+      paused: true,
+    );
+    SoLoud.instance.setRelativePlaySpeed(handle, settings.rate);
+    SoLoud.instance.setPause(handle, false);
+  }
+
+  /// Loads one source per Kit slot. One kit per project, so this runs once.
+  Future<void> _ensureKitSources() {
+    final spec = _spec;
+    if (spec == null || !_initialized || spec.kitClips.isEmpty) {
+      return Future.value();
+    }
+    if (identical(_kitSourcesFor, spec.kitClips)) {
+      return _kitLoading ?? Future.value();
+    }
+    _kitSourcesFor = spec.kitClips;
+    return _kitLoading = _rebuildKitSources(spec.kitClips, ++_kitGeneration);
+  }
+
+  Future<void> _rebuildKitSources(List<AudioClip> clips, int generation) async {
+    await _disposeKitSources();
+    for (var i = 0; i < clips.length; i++) {
+      if (generation != _kitGeneration || _shuttingDown) return;
+      final clip = clips[i];
+      final bytes = encodeWav(
+        clip.samples,
+        sampleRate: clip.sampleRate,
+        channels: clip.channels,
+      );
+      final source = await SoLoud.instance.loadMem(
+        'junglengine-kit-$i.wav',
+        bytes,
+      );
+      if (generation != _kitGeneration) {
+        await SoLoud.instance.disposeSource(source);
+        return;
+      }
+      _kitSources.add(source);
+    }
+  }
+
+  Future<void> _disposeKitSources() async {
+    final sources = List<AudioSource>.of(_kitSources);
+    _kitSources.clear();
+    for (final s in sources) {
+      try {
+        await SoLoud.instance.disposeSource(s);
+      } on SoLoudException {
+        // Already gone.
+      }
+    }
+  }
+
+  @override
   Future<Float32List> renderOffline(RenderSpec spec, int frameCount) async {
     return renderPatternOffline(spec, frameCount);
   }
@@ -433,4 +512,10 @@ void _renderRun(
 /// rate, peak normalised.
 Future<AudioClip> loadBreakClip(Uint8List bytes, int sampleRate) async {
   return decodeWav(bytes).toStereo().resampledTo(sampleRate).normalized();
+}
+
+/// Loads a bundled one shot: stereo, at the engine rate, left at the level it
+/// was recorded at so a kit keeps its balance.
+AudioClip loadOneShotClip(Uint8List bytes, int sampleRate) {
+  return decodeWav(bytes).toStereo().resampledTo(sampleRate);
 }

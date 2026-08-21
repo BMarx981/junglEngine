@@ -72,7 +72,11 @@ class TransportBar extends ConsumerWidget {
             children: [
               const _BpmControl(),
               const SizedBox(width: 14),
-              Expanded(child: _SliceSelector(division: state.sliceDivision)),
+              Expanded(
+                child: state.beat.isKit
+                    ? _MachineReadout(name: state.kitRef.name)
+                    : _SliceSelector(division: state.sliceDivision),
+              ),
             ],
           ),
         ],
@@ -197,6 +201,41 @@ class _SliceChip extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// What a Kit Beat shows where a Chop Beat shows its slice divisions. The kit
+/// is fixed per project, so this is a readout rather than a control.
+class _MachineReadout extends StatelessWidget {
+  const _MachineReadout({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('KIT', style: Theme.of(context).textTheme.labelSmall),
+        const SizedBox(height: 3),
+        SizedBox(
+          height: 30,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              name.toUpperCase(),
+              style: const TextStyle(
+                color: JungleTheme.text,
+                fontSize: 13,
+                letterSpacing: 0.8,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

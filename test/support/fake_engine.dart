@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:junglengine/audio/engine.dart';
 import 'package:junglengine/audio/pattern_renderer.dart';
@@ -25,6 +24,7 @@ class FakeAudioEngine implements AudioEngine {
 
   RenderSpec? lastSpec;
   final List<int> auditioned = [];
+  final List<int> auditionedSlots = [];
   int startCount = 0;
   int stopCount = 0;
 
@@ -64,6 +64,9 @@ class FakeAudioEngine implements AudioEngine {
   @override
   Future<void> auditionSlice(int sliceIndex) async =>
       auditioned.add(sliceIndex);
+
+  @override
+  Future<void> auditionKitSlot(int slot) async => auditionedSlots.add(slot);
 
   @override
   Future<Float32List> renderOffline(RenderSpec spec, int frameCount) async =>
