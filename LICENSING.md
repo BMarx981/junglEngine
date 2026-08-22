@@ -10,6 +10,8 @@ below is still `UNCLEARED`.
 | --- | --- | --- | --- |
 | `dnb-full02-170` | `assets/breaks/DnB_full02_loop_170.wav` | **Not yet recorded.** Added to the assets folder on 2026-08-21; where it came from is unknown to the code. | **UNCLEARED** |
 | `hawkstreak-amenish-170` | `assets/breaks/hawkstreak_amenish_170.wav` | Synthesised from scratch by `tool/make_break.dart`. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
+| `hawkstreak-steppa-170` | `assets/breaks/hawkstreak_steppa_170.wav` | Synthesised from scratch by `tool/make_break.dart`. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
+| `hawkstreak-roller-170` | `assets/breaks/hawkstreak_roller_170.wav` | Synthesised from scratch by `tool/make_break.dart`. Two bars. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
 
 ### `dnb-full02-170` needs a provenance line
 
@@ -40,6 +42,7 @@ are per bar, so a wrong bar count makes every slice the wrong note value.
 | ID | Files | Origin | Status |
 | --- | --- | --- | --- |
 | `hawkstreak-01` | `assets/kits/hawkstreak/hawkstreak_*.wav` (8 files) | Synthesised from scratch by `tool/make_kit.dart`. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
+| `hawkstreak-02` | `assets/kits/hawkstreak02/hawkstreak02_*.wav` (8 files) | Synthesised from scratch by `tool/make_kit.dart`. The dark kit. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
 
 ### The M1 kit is synthesised, not the Reason kit
 

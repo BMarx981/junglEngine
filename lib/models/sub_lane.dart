@@ -12,31 +12,47 @@ const int subMaxSemitone = 12;
 /// - `semitone != null && tie` glides to that pitch without retriggering.
 /// - `semitone == null && tie` holds the previous pitch.
 class SubStep {
-  const SubStep({this.semitone, this.tie = false});
+  const SubStep({this.semitone, this.tie = false, this.accent = false});
 
-  const SubStep.rest() : semitone = null, tie = false;
+  const SubStep.rest() : semitone = null, tie = false, accent = false;
 
   final int? semitone;
   final bool tie;
 
+  /// Opens the filter on this note only. The sub synth has one lowpass and no
+  /// modulation, so this is the whole of its dynamics: an accented note speaks
+  /// where the ones around it sit under the drums.
+  final bool accent;
+
   bool get isRest => semitone == null && !tie;
 
-  SubStep copyWith({int? semitone, bool clearSemitone = false, bool? tie}) {
+  SubStep copyWith({
+    int? semitone,
+    bool clearSemitone = false,
+    bool? tie,
+    bool? accent,
+  }) {
     return SubStep(
       semitone: clearSemitone ? null : (semitone ?? this.semitone),
       tie: tie ?? this.tie,
+      accent: accent ?? this.accent,
     );
   }
 
   Map<String, Object?> toJson() => {
     if (semitone != null) 'n': semitone,
     if (tie) 't': true,
+    if (accent) 'a': true,
   };
 
   static SubStep fromJson(Object? json) {
     if (json is! Map) return const SubStep.rest();
     final n = json['n'];
-    return SubStep(semitone: n is int ? n : null, tie: json['t'] == true);
+    return SubStep(
+      semitone: n is int ? n : null,
+      tie: json['t'] == true,
+      accent: json['a'] == true,
+    );
   }
 }
 
@@ -71,6 +87,14 @@ class SubLane {
   SubLane toggledTie(int step) {
     if (step <= 0) return this;
     return withStep(step, steps[step].copyWith(tie: !steps[step].tie));
+  }
+
+  /// Accents the cell, if there is a note on it to accent.
+  SubLane toggledAccent(int step) {
+    if (step < 0 || step >= steps.length) return this;
+    final cell = steps[step];
+    if (cell.isRest) return this;
+    return withStep(step, cell.copyWith(accent: !cell.accent));
   }
 
   SubLane cleared() => SubLane.empty(bars: bars);

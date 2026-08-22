@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:junglengine/features/bass/sub_lane_view.dart';
 import 'package:junglengine/features/grid/chop_grid.dart';
+import 'package:junglengine/features/grid/step_mod_sheet.dart';
+import 'package:junglengine/features/song/song_view.dart';
+import 'package:junglengine/models/step_mod.dart';
 import 'package:junglengine/features/kit/kit_grid.dart';
 import 'package:junglengine/features/song/beat_bar.dart';
 import 'package:junglengine/features/song/new_beat_sheet.dart';
@@ -365,5 +368,133 @@ void main() {
     await tester.pump();
 
     expect(engine.lastSpec!.beat.chop.sliceAt(32), 1);
+  });
+
+  testWidgets('holding a painted cell opens the step modifier picker', (
+    tester,
+  ) async {
+    final engine = await pumpStudio(tester);
+
+    final grid = tester.getRect(find.byType(ChopGrid));
+    final sliceCount = engine.lastSpec!.beat.sliceCount;
+    final rowHeight = (grid.height / sliceCount).clamp(
+      ChopGrid.minRowHeight,
+      ChopGrid.maxRowHeight,
+    );
+    final cellsLeft = grid.left + ChopGrid.gutterWidth;
+    final cellWidth = (grid.width - ChopGrid.gutterWidth) / 16;
+
+    // The identity pattern has slice 2 on step 2, so this cell has a hit on it.
+    await tester.longPressAt(
+      Offset(cellsLeft + cellWidth * 2.5, grid.top + rowHeight * 2.5),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(StepModSheet), findsOneWidget);
+    expect(find.text('SLICE 3'), findsOneWidget);
+    for (final label in ['PLAIN', 'REVERSE', 'RETRIG', 'PITCH DOWN']) {
+      expect(find.text(label), findsOneWidget);
+    }
+
+    await tester.tap(find.text('HALF SPEED'));
+    await tester.pumpAndSettle();
+
+    expect(engine.lastSpec!.beat.chop.modAt(2), StepMod.halfSpeed);
+  });
+
+  testWidgets('the song view arranges cards and plays them', (tester) async {
+    final engine = await pumpStudio(tester);
+
+    await tester.tap(inBeatBar('SONG'));
+    await tester.pumpAndSettle();
+
+    // The grid and the sub lane give way to the arrangement. The bank stays:
+    // in the Song view it is the palette the ADD button adds from.
+    expect(find.byType(SongView), findsOneWidget);
+    expect(find.byType(ChopGrid), findsNothing);
+    expect(find.byType(SubLaneView), findsNothing);
+    expect(find.byType(BeatBar), findsOneWidget);
+    expect(inBeatBar('GRID'), findsOneWidget);
+    expect(find.textContaining('NOTHING ARRANGED'), findsOneWidget);
+
+    await tester.tap(inActionBar('ADD A'));
+    await tester.pump();
+
+    expect(find.text('1x'), findsOneWidget);
+    expect(find.text('1 CARD   1 BAR'), findsOneWidget);
+    expect(engine.lastSpec!.isSong, isTrue);
+    expect(engine.lastSpec!.sections, hasLength(1));
+
+    // The stepper is the whole of arranging: one card, played four times.
+    await tester.tap(find.byIcon(Icons.add).last);
+    await tester.pump();
+    await tester.tap(find.byIcon(Icons.add).last);
+    await tester.pump();
+
+    expect(find.text('3x'), findsOneWidget);
+    expect(find.text('1 CARD   3 BARS'), findsOneWidget);
+    expect(engine.lastSpec!.sections, hasLength(3));
+  });
+
+  testWidgets('tapping a card opens that Beat back on the grid', (
+    tester,
+  ) async {
+    final engine = await pumpStudio(tester);
+
+    await tester.tap(inBeatBar('DUP'));
+    await tester.pump();
+    await tester.tap(inBeatBar('SONG'));
+    await tester.pumpAndSettle();
+    await tester.tap(inActionBar('ADD B'));
+    await tester.pump();
+
+    // The card, not the bank chip of the same name.
+    await tester.tap(
+      find.descendant(of: find.byType(SongView), matching: find.text('B')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChopGrid), findsOneWidget);
+    expect(engine.lastSpec!.isSong, isFalse);
+    expect(engine.lastSpec!.beat.name, 'B');
+  });
+
+  testWidgets('the bank picks what the song view adds', (tester) async {
+    final engine = await pumpStudio(tester);
+
+    await tester.tap(inBeatBar('DUP'));
+    await tester.pump();
+    await tester.tap(inBeatBar('SONG'));
+    await tester.pumpAndSettle();
+
+    // Opened on B after the duplicate. Tapping A in the bank makes A what the
+    // ADD button adds, without leaving the arrangement.
+    expect(inActionBar('ADD B'), findsOneWidget);
+    await tester.tap(inBeatBar('A'));
+    await tester.pump();
+    expect(inActionBar('ADD A'), findsOneWidget);
+    expect(find.byType(SongView), findsOneWidget);
+
+    await tester.tap(inActionBar('ADD A'));
+    await tester.pump();
+
+    expect(engine.lastSpec!.sections.single.beat.name, 'A');
+  });
+
+  testWidgets('the library sheet switches the project break', (tester) async {
+    final engine = await pumpStudio(tester);
+
+    await tester.tap(find.text(BreakLibrary.defaultBreak.name.toUpperCase()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('BREAK'), findsOneWidget);
+    expect(find.text('KIT'), findsOneWidget);
+    expect(find.text('ROLLER'), findsOneWidget);
+
+    await tester.tap(find.text('STEPPA'));
+    await tester.pumpAndSettle();
+
+    expect(engine.lastSpec!.beat.sliceCount, 16);
+    expect(inTransportBar('STEPPA'), findsOneWidget);
   });
 }

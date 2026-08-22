@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/steps.dart';
@@ -58,7 +59,7 @@ class _SubLaneViewState extends ConsumerState<SubLaneView> {
               Text(
                 _dragSemitone != null
                     ? noteName(beat.subRootMidi + _dragSemitone!)
-                    : 'DRAG A COLUMN FOR PITCH',
+                    : 'DRAG PITCH HOLD ACCENT',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: _dragSemitone != null
                       ? JungleTheme.sub
@@ -92,6 +93,14 @@ class _SubLaneViewState extends ConsumerState<SubLaneView> {
                   _dragStep = null;
                   _dragSemitone = null;
                 }),
+                // Hold a note to accent it: the filter opens on that note and
+                // nothing else about it changes.
+                onLongPressStart: (details) {
+                  final step = _stepAt(details.localPosition.dx, columnWidth);
+                  if (beat.sub.stepAt(step).isRest) return;
+                  HapticFeedback.selectionClick();
+                  ref.read(studioProvider.notifier).toggleAccent(step);
+                },
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -309,9 +318,17 @@ class _SubLanePainter extends CustomPainter {
         );
       }
 
+      // An accented note is drawn thicker, because that is what it sounds
+      // like: the same note, further open, speaking over the drums.
+      final thickness = cell.accent ? 10.0 : 6.0;
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTWH(left + 1.5, y - 3, columnWidth - 3, 6),
+          Rect.fromLTWH(
+            left + 1.5,
+            y - thickness / 2,
+            columnWidth - 3,
+            thickness,
+          ),
           const Radius.circular(3),
         ),
         cell.semitone == null ? held : note,
@@ -339,7 +356,8 @@ class _SubLanePainter extends CustomPainter {
     }
     for (var i = 0; i < steps.length; i++) {
       if (old.steps[i].semitone != steps[i].semitone ||
-          old.steps[i].tie != steps[i].tie) {
+          old.steps[i].tie != steps[i].tie ||
+          old.steps[i].accent != steps[i].accent) {
         return true;
       }
     }

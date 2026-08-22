@@ -1,10 +1,15 @@
-// Generates the bundled placeholder break.
+// Generates the bundled Hawkstreak breaks.
 //
 // Original content, synthesised from scratch, so junglEngine has something to
-// chop on day one with no sample clearance attached to it. Drop a real break
-// into assets/breaks/ and register it in BreakLibrary to replace this.
+// chop with no sample clearance attached to it. Drop a real break into
+// assets/breaks/ and register it in BreakLibrary to add to these.
 //
 //   dart run tool/make_break.dart
+//
+// Three of them, and deliberately three different shapes rather than three
+// versions of the same bar: a one bar amen, a one bar half time stepper, and a
+// two bar roller. The two bar one is also what proves slice divisions are per
+// bar and not per break.
 //
 // See LICENSING.md.
 
@@ -16,56 +21,164 @@ import 'package:junglengine/audio/wav.dart';
 
 const int sampleRate = 44100;
 const double bpm = 170;
-const String outputPath = 'assets/breaks/hawkstreak_amenish_170.wav';
 
 void main() {
-  final frames = (sampleRate * 4 * 60 / bpm).round();
-  final mix = Float32List(frames * 2);
-  final random = math.Random(1974);
+  _write(
+    path: 'assets/breaks/hawkstreak_amenish_170.wav',
+    bars: 1,
+    seed: 1974,
+    build: _amenish,
+  );
+  _write(
+    path: 'assets/breaks/hawkstreak_steppa_170.wav',
+    bars: 1,
+    seed: 1991,
+    build: _steppa,
+  );
+  _write(
+    path: 'assets/breaks/hawkstreak_roller_170.wav',
+    bars: 2,
+    seed: 1996,
+    build: _roller,
+  );
+}
 
-  final kick = _kick(random);
-  final snare = _snare(random, 1.0);
-  final ghost = _snare(random, 0.34, short: true);
-  final hat = _hat(random, open: false);
-  final openHat = _hat(random, open: true);
+/// A break being built: the mix, and where its steps fall.
+class _Take {
+  _Take({required this.mix, required this.stepFrames, required this.random});
 
-  final stepFrames = frames / 16.0;
+  final Float32List mix;
+  final double stepFrames;
+  final math.Random random;
+
   void at(int step, Float32List voice, {double gain = 1, double pan = 0}) {
     _mixInto(mix, voice, (step * stepFrames).round(), gain: gain, pan: pan);
   }
+}
 
-  // A straight, amen shaped bar. Kick, backbeat, ghosts on the pickups, eighth
-  // note hats. Sliced into 16 this gives one hit per row.
-  at(0, kick, gain: 1.0);
-  at(10, kick, gain: 0.94);
-  at(3, kick, gain: 0.42);
-
-  at(4, snare, gain: 1.0);
-  at(12, snare, gain: 0.98);
-
-  at(7, ghost, gain: 0.8, pan: -0.12);
-  at(11, ghost, gain: 0.62, pan: 0.15);
-  at(14, ghost, gain: 0.9, pan: -0.05);
-  at(15, ghost, gain: 0.5, pan: 0.2);
-
-  for (var step = 0; step < 16; step += 2) {
-    if (step == 8) continue;
-    at(step, hat, gain: step % 4 == 0 ? 0.5 : 0.34, pan: 0.22);
-  }
-  at(8, openHat, gain: 0.46, pan: 0.26);
+void _write({
+  required String path,
+  required int bars,
+  required int seed,
+  required void Function(_Take take) build,
+}) {
+  final frames = (sampleRate * 4 * bars * 60 / bpm).round();
+  final mix = Float32List(frames * 2);
+  build(
+    _Take(
+      mix: mix,
+      stepFrames: frames / (16.0 * bars),
+      random: math.Random(seed),
+    ),
+  );
 
   _room(mix);
   _saturate(mix);
   _normalize(mix, 0.92);
   _wrapTail(mix);
 
-  final bytes = encodeWav(mix, sampleRate: sampleRate, channels: 2);
-  File(outputPath).writeAsBytesSync(bytes);
+  File(
+    path,
+  ).writeAsBytesSync(encodeWav(mix, sampleRate: sampleRate, channels: 2));
   stdout.writeln(
-    'wrote $outputPath  '
+    'wrote $path  '
     '$frames frames  ${(frames / sampleRate).toStringAsFixed(3)}s  '
-    '${bpm.toStringAsFixed(0)} bpm',
+    '$bars bar${bars == 1 ? '' : 's'}  ${bpm.toStringAsFixed(0)} bpm',
   );
+}
+
+/// A straight, amen shaped bar. Kick, backbeat, ghosts on the pickups, eighth
+/// note hats. Sliced into 16 this gives one hit per row.
+void _amenish(_Take take) {
+  final random = take.random;
+  final kick = _kick(random);
+  final snare = _snare(random, 1.0);
+  final ghost = _snare(random, 0.34, short: true);
+  final hat = _hat(random, open: false);
+  final openHat = _hat(random, open: true);
+
+  take.at(0, kick, gain: 1.0);
+  take.at(10, kick, gain: 0.94);
+  take.at(3, kick, gain: 0.42);
+
+  take.at(4, snare, gain: 1.0);
+  take.at(12, snare, gain: 0.98);
+
+  take.at(7, ghost, gain: 0.8, pan: -0.12);
+  take.at(11, ghost, gain: 0.62, pan: 0.15);
+  take.at(14, ghost, gain: 0.9, pan: -0.05);
+  take.at(15, ghost, gain: 0.5, pan: 0.2);
+
+  for (var step = 0; step < 16; step += 2) {
+    if (step == 8) continue;
+    take.at(step, hat, gain: step % 4 == 0 ? 0.5 : 0.34, pan: 0.22);
+  }
+  take.at(8, openHat, gain: 0.46, pan: 0.26);
+}
+
+/// Half time: one backbeat on step 8 instead of two on 4 and 12, so the same
+/// tempo reads at half the speed. This is the one to chop when a tune needs to
+/// drop into something heavier.
+void _steppa(_Take take) {
+  final random = take.random;
+  final kick = _kick(random);
+  final snare = _snare(random, 1.0);
+  final ghost = _snare(random, 0.3, short: true);
+  final hat = _hat(random, open: false);
+  final openHat = _hat(random, open: true);
+
+  take.at(0, kick, gain: 1.0);
+  take.at(11, kick, gain: 0.66);
+
+  take.at(8, snare, gain: 1.0);
+
+  take.at(14, ghost, gain: 0.55, pan: -0.14);
+  take.at(15, ghost, gain: 0.34, pan: 0.18);
+
+  for (var step = 0; step < 16; step += 2) {
+    if (step == 6) continue;
+    take.at(step, hat, gain: step % 4 == 0 ? 0.46 : 0.3, pan: 0.2);
+  }
+  take.at(6, openHat, gain: 0.42, pan: 0.24);
+}
+
+/// Two bars that do not repeat: the second drops a backbeat and rolls into the
+/// turnaround. At 16 divisions this is 32 rows, which is the grid a longer
+/// break was worth building paging for.
+void _roller(_Take take) {
+  final random = take.random;
+  final kick = _kick(random);
+  final snare = _snare(random, 1.0);
+  final ghost = _snare(random, 0.36, short: true);
+  final hat = _hat(random, open: false);
+  final openHat = _hat(random, open: true);
+
+  // Bar one: the statement.
+  take.at(0, kick, gain: 1.0);
+  take.at(10, kick, gain: 0.9);
+  take.at(4, snare, gain: 1.0);
+  take.at(12, snare, gain: 0.96);
+  take.at(3, ghost, gain: 0.5, pan: -0.1);
+  take.at(7, ghost, gain: 0.78, pan: 0.12);
+  take.at(14, ghost, gain: 0.66, pan: -0.06);
+
+  // Bar two: the answer. The kick pushes onto the offbeat and the last
+  // backbeat is replaced by a drag into the top of the loop.
+  take.at(16, kick, gain: 0.98);
+  take.at(22, kick, gain: 0.82);
+  take.at(26, kick, gain: 0.5);
+  take.at(20, snare, gain: 1.0);
+  take.at(27, ghost, gain: 0.7, pan: 0.1);
+  take.at(29, ghost, gain: 0.86, pan: -0.12);
+  take.at(30, ghost, gain: 0.6, pan: 0.16);
+  take.at(31, ghost, gain: 0.44, pan: -0.2);
+
+  for (var step = 0; step < 32; step += 2) {
+    if (step == 8 || step == 24) continue;
+    take.at(step, hat, gain: step % 4 == 0 ? 0.48 : 0.32, pan: 0.22);
+  }
+  take.at(8, openHat, gain: 0.44, pan: 0.26);
+  take.at(24, openHat, gain: 0.5, pan: 0.26);
 }
 
 Float32List _kick(math.Random random) {

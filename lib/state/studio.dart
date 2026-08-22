@@ -20,6 +20,8 @@ import '../models/kit_pattern.dart';
 import '../models/kit_ref.dart';
 import '../models/machine_type.dart';
 import '../models/project.dart';
+import '../models/song.dart';
+import '../models/step_mod.dart';
 import '../models/steps.dart';
 import '../models/sub_lane.dart';
 import 'project_store.dart';
@@ -43,6 +45,22 @@ final transportProvider = Provider<ValueListenable<TransportState>>(
 
 enum StudioStatus { loading, ready, failed }
 
+/// Which of the two things the screen is doing.
+///
+/// Not navigation: the same transport, the same sub synth and the same export
+/// button are on screen either way. [song] swaps the grid for the arrangement
+/// list and points playback at the whole song instead of one looping pattern.
+enum StudioView { pattern, song }
+
+/// What the export button renders.
+enum ExportMode {
+  /// The open Beat, looped.
+  loop,
+
+  /// The whole arrangement, once through.
+  song,
+}
+
 @immutable
 class StudioState {
   const StudioState({
@@ -57,8 +75,10 @@ class StudioState {
     this.errorMessage,
     this.canUndo = false,
     this.exportRepeats = 2,
+    this.exportMode = ExportMode.loop,
     this.exporting = false,
     this.activeBar = 0,
+    this.view = StudioView.pattern,
   });
 
   final Project project;
@@ -82,11 +102,25 @@ class StudioState {
   /// paged rather than squeezed or scrolled sideways.
   final int activeBar;
 
-  /// How many passes of the pattern an export writes.
+  /// How many passes of the pattern an export writes. Loop mode only: a song
+  /// export is the arrangement, once.
   final int exportRepeats;
+  final ExportMode exportMode;
   final bool exporting;
 
+  /// Grid or arrangement.
+  final StudioView view;
+
   Beat get beat => project.beatById(activeBeatId) ?? project.firstBeat;
+
+  Song get song => project.song;
+
+  bool get inSong => view == StudioView.song;
+
+  /// Whether playback would follow the arrangement rather than loop the open
+  /// Beat. An empty song has nothing to play, so the Song view still loops
+  /// what is open until a card is added.
+  bool get playsSong => inSong && project.songIsPlayable;
 
   /// Bars in the project break, floored at one so a bad [BreakRef] cannot
   /// divide by zero.
@@ -112,7 +146,9 @@ class StudioState {
     String? activeBeatId,
     int? activeBar,
     int? exportRepeats,
+    ExportMode? exportMode,
     bool? exporting,
+    StudioView? view,
     BreakRef? breakRef,
     KitRef? kitRef,
   }) => StudioState(
@@ -128,7 +164,9 @@ class StudioState {
     activeBeatId: activeBeatId ?? this.activeBeatId,
     activeBar: activeBar ?? this.activeBar,
     exportRepeats: exportRepeats ?? this.exportRepeats,
+    exportMode: exportMode ?? this.exportMode,
     exporting: exporting ?? this.exporting,
+    view: view ?? this.view,
   );
 }
 
@@ -295,13 +333,49 @@ class StudioController extends Notifier<StudioState> {
     }
   }
 
+  /// What should be playing: the open Beat on a loop, or the arrangement.
   RenderSpec? _specFor(StudioState s) {
+    final sections = s.inSong ? _songSections(s) : const <RenderSection>[];
+    return sections.isEmpty
+        ? _specOf(s, [RenderSection(beat: s.beat)])
+        : _specOf(s, sections);
+  }
+
+  /// The song flattened into one section per pass.
+  ///
+  /// Repeats are expanded here rather than in the sequencer, which is what
+  /// makes playback across machine types seamless: by the time the mixer sees
+  /// it, an arrangement is just a longer list of patterns to walk.
+  static List<RenderSection> _songSections(StudioState s) {
+    final sections = <RenderSection>[];
+    final entries = s.project.song.entries;
+    for (var index = 0; index < entries.length; index++) {
+      final entry = entries[index];
+      final beat = s.project.beatById(entry.beatId);
+      if (beat == null) continue;
+      for (var pass = 0; pass < entry.repeats; pass++) {
+        sections.add(RenderSection(beat: beat, entryIndex: index));
+      }
+    }
+    return sections;
+  }
+
+  /// A spec for the whole arrangement, whatever the screen is showing. Used by
+  /// song export, which does not care which view you are in.
+  RenderSpec? _songSpec() {
+    final sections = _songSections(state);
+    return sections.isEmpty ? null : _specOf(state, sections);
+  }
+
+  /// The one place a [RenderSpec] is built: same clips, same tempo, same
+  /// sample rate, whatever is on the timeline.
+  RenderSpec? _specOf(StudioState s, List<RenderSection> sections) {
     final clip = s.clip;
     if (clip == null) return null;
-    return RenderSpec(
+    return RenderSpec.of(
       breakClip: clip,
       kitClips: s.kitClips,
-      beat: s.beat,
+      sections: sections,
       bpm: s.project.bpm,
       sampleRate: _engine.sampleRate,
     );
@@ -434,6 +508,62 @@ class StudioController extends Notifier<StudioState> {
     state = state.copyWith(activeBar: clamped);
   }
 
+  // --- Song ----------------------------------------------------------------
+
+  /// Grid or arrangement. Switching while the transport runs restarts it,
+  /// because what is playing is a different timeline, not a different view of
+  /// the same one.
+  void setView(StudioView view) {
+    if (view == state.view) return;
+    state = state.copyWith(view: view);
+    _syncEngine();
+  }
+
+  /// Opens a Beat from the Song view. The card you tapped is the pattern you
+  /// get, which is the only navigation this app has.
+  void openBeatFromSong(String beatId) {
+    selectBeat(beatId);
+    setView(StudioView.pattern);
+  }
+
+  /// Appends a Beat to the arrangement. Defaults to whatever is open, because
+  /// the usual move is write a pattern, then put it in the song.
+  void addToSong([String? beatId]) {
+    final id = beatId ?? state.activeBeatId;
+    if (state.project.beatById(id) == null) return;
+    state = state.copyWith(
+      project: state.project.withSong(
+        state.project.song.withEntry(SongEntry(beatId: id)),
+      ),
+    );
+    _syncEngine();
+  }
+
+  void removeSongEntry(int index) {
+    final song = state.project.song;
+    if (index < 0 || index >= song.length) return;
+    state = state.copyWith(project: state.project.withSong(song.withoutAt(index)));
+    _syncEngine();
+  }
+
+  void setSongRepeats(int index, int repeats) {
+    final song = state.project.song;
+    final entry = song.entryAt(index);
+    if (entry == null) return;
+    final next = song.withRepeatsAt(index, repeats);
+    if (next.entryAt(index)!.repeats == entry.repeats) return;
+    state = state.copyWith(project: state.project.withSong(next));
+    _syncEngine();
+  }
+
+  void moveSongEntry(int from, int to) {
+    if (from == to) return;
+    state = state.copyWith(
+      project: state.project.withSong(state.project.song.moved(from, to)),
+    );
+    _syncEngine();
+  }
+
   /// The analysis is per slice count, so it only has to be redone when the Beat
   /// being opened divides the break differently.
   SliceAnalysis? _analysisFor(Beat beat) {
@@ -459,6 +589,20 @@ class StudioController extends Notifier<StudioState> {
     if (beat.chop.sliceAt(step) == slice) return;
     _commit(beat.copyWith(chop: beat.chop.withStep(step, slice)));
     unawaited(_engine.auditionSlice(slice));
+  }
+
+  /// Long press: puts a modifier on a step that already holds a slice.
+  ///
+  /// Reverse, retrigger, pitch down, half speed. An empty step has nothing to
+  /// modify, so this does nothing there rather than inventing a slice.
+  void setStepMod(int step, StepMod mod) {
+    final beat = state.beat;
+    if (beat.isKit) return;
+    final next = beat.chop.withMod(step, mod);
+    if (identical(next, beat.chop)) return;
+    // Deliberately silent. The audition sources are plain slices, so previewing
+    // here would play the one thing the modifier is not.
+    _commit(beat.copyWith(chop: next));
   }
 
   void clearStep(int step) {
@@ -583,6 +727,14 @@ class StudioController extends Notifier<StudioState> {
     _commit(beat.copyWith(sub: beat.sub.toggledTie(step)));
   }
 
+  /// Accents a sub note, which opens the filter on that note only.
+  void toggleAccent(int step) {
+    final beat = state.beat;
+    final next = beat.sub.toggledAccent(step);
+    if (identical(next, beat.sub)) return;
+    _commit(beat.copyWith(sub: next));
+  }
+
   void clearSub() {
     final beat = state.beat;
     if (beat.sub.isEmpty) return;
@@ -606,6 +758,15 @@ class StudioController extends Notifier<StudioState> {
     _syncEngine();
   }
 
+  /// Swing for the open Beat, 0..1. Global per Beat by design: this is the
+  /// answer to triplet feel, not a per step nudge.
+  void setSwing(double swing) {
+    final beat = state.beat;
+    final clamped = swing.clamp(0.0, 1.0);
+    if ((clamped - beat.swing).abs() < 0.001) return;
+    _commit(beat.copyWith(swing: clamped));
+  }
+
   Future<void> togglePlay() async {
     if (!state.isReady) return;
     if (_engine.transport.value.playing) {
@@ -617,21 +778,90 @@ class StudioController extends Notifier<StudioState> {
 
   Future<void> auditionSlice(int slice) => _engine.auditionSlice(slice);
 
+  // --- Project library -----------------------------------------------------
+
+  /// Points the project at a different bundled break.
+  ///
+  /// Still one break per project: this changes which one, not how many. Slice
+  /// counts are per bar of the break, so every Chop Beat is re-divided at the
+  /// division it was already using and any painted slice past the end of the
+  /// new break is dropped.
+  Future<void> setBreak(String breakId) async {
+    if (breakId == state.project.breakId) return;
+    final ref = BreakLibrary.byId(breakId);
+    try {
+      final clip = await BreakLibrary.load(ref, _engine.sampleRate);
+      final wasBars = state.breakBars;
+      final bars = ref.bars < 1 ? 1 : ref.bars;
+      final beats = [
+        for (final beat in state.project.beats)
+          if (beat.isKit)
+            beat
+          else
+            beat.resliced(_divisionOf(beat.sliceCount, wasBars) * bars),
+      ];
+      final project = state.project.copyWith(breakId: ref.id, beats: beats);
+      final open = project.beatById(state.activeBeatId) ?? project.firstBeat;
+      state = state.copyWith(
+        project: project,
+        breakRef: ref,
+        clip: clip,
+        analysis: SliceAnalysis.of(clip, open.sliceCount),
+      );
+      _syncEngine();
+    } on Object catch (error) {
+      debugPrint('junglengine: break not loaded ($error)');
+    }
+  }
+
+  /// Slices per bar behind a total, falling back to the middle division if a
+  /// file ever holds a total that is not a whole number of divisions.
+  static int _divisionOf(int sliceCount, int bars) {
+    final division = bars <= 0 ? sliceCount : sliceCount ~/ bars;
+    return allowedSliceDivisions.contains(division) ? division : 16;
+  }
+
+  /// Points the project at a different bundled kit. Slot volumes and pitches
+  /// stay where they are: they belong to the Beat, not to the samples.
+  Future<void> setKit(String kitId) async {
+    if (kitId == state.project.kitId) return;
+    final ref = KitLibrary.byId(kitId);
+    try {
+      final clips = await KitLibrary.load(ref, _engine.sampleRate);
+      state = state.copyWith(
+        project: state.project.copyWith(kitId: ref.id),
+        kitRef: ref,
+        kitClips: clips,
+      );
+      _syncEngine();
+    } on Object catch (error) {
+      debugPrint('junglengine: kit not loaded ($error)');
+    }
+  }
+
   // --- Export --------------------------------------------------------------
 
   void setExportRepeats(int repeats) =>
       state = state.copyWith(exportRepeats: repeats);
 
+  void setExportMode(ExportMode mode) =>
+      state = state.copyWith(exportMode: mode);
+
+  /// Renders either the open Beat looped or the whole arrangement, depending on
+  /// [StudioState.exportMode]. A song renders once through: repeating an
+  /// arrangement is what the repeat counts are for.
   Future<ExportResult?> exportWav() async {
-    final spec = _specFor(state);
-    if (spec == null || state.exporting) return null;
+    if (state.exporting) return null;
+    final song = state.exportMode == ExportMode.song;
+    final spec = song ? _songSpec() : _specFor(state);
+    if (spec == null) return null;
     state = state.copyWith(exporting: true);
     try {
-      return await WavExporter.exportLoop(
+      return await WavExporter.export(
         engine: _engine,
         spec: spec,
-        repeats: state.exportRepeats,
-        beatName: state.beat.name,
+        repeats: song ? 1 : state.exportRepeats,
+        name: song ? state.project.name : state.beat.name,
       );
     } finally {
       state = state.copyWith(exporting: false);

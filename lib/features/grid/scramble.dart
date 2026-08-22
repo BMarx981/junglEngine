@@ -24,22 +24,24 @@ ChopPattern scramblePattern({
   double density = 0.42,
 }) {
   final random = Random(seed);
-  final steps = List<int?>.filled(current.length, null);
+  final steps = List<ChopStep?>.filled(current.length, null);
 
   final kicks = analysis.kicks;
   final snares = analysis.snares;
   final ghosts = analysis.ghosts;
 
-  int pick(List<int> pool) => pool[random.nextInt(pool.length)];
+  ChopStep pick(List<int> pool) => ChopStep(pool[random.nextInt(pool.length)]);
 
   for (var step = 0; step < steps.length; step++) {
     final inBar = step % stepsPerBar;
     final onQuarter = inBar % stepsPerBeat == 0;
-    final existing = current.sliceAt(step);
+    final existing = current.stepAt(step);
 
     if (onQuarter) {
-      // Anchored: keep what is there most of the time.
-      if (existing != null && existing < analysis.sliceCount) {
+      // Anchored: keep what is there most of the time, modifier and all. A
+      // reverse you put on the downbeat is part of the groove you are
+      // evolving, not something to shuffle away.
+      if (existing != null && existing.slice < analysis.sliceCount) {
         if (random.nextDouble() < 0.72) {
           steps[step] = existing;
           continue;
@@ -65,5 +67,5 @@ ChopPattern scramblePattern({
     steps[step] = random.nextDouble() < 0.78 ? pick(ghosts) : pick(snares);
   }
 
-  return ChopPattern(List<int?>.unmodifiable(steps));
+  return ChopPattern(List<ChopStep?>.unmodifiable(steps));
 }

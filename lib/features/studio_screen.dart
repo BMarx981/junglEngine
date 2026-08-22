@@ -7,6 +7,7 @@ import 'bass/sub_lane_view.dart';
 import 'grid/chop_grid.dart';
 import 'kit/kit_grid.dart';
 import 'song/beat_bar.dart';
+import 'song/song_view.dart';
 import 'transport/action_bar.dart';
 import 'transport/bar_strip.dart';
 import 'transport/transport_bar.dart';
@@ -48,27 +49,42 @@ class _Studio extends ConsumerWidget {
     // Which machine the open Beat runs decides the grid, and nothing else on
     // the screen. Transport, sub lane and export are shared by both.
     final isKit = ref.watch(studioProvider.select((s) => s.beat.isKit));
+    final inSong = ref.watch(studioProvider.select((s) => s.inSong));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const TransportBar(),
+        // The bank is on screen in both views: on the grid it says what you are
+        // editing, in the Song view it says what the ADD button will add.
         const BeatBar(),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-            child: isKit ? const KitGrid() : const ChopGrid(),
+        // The arrangement replaces the grid and the sub lane rather than
+        // sitting on top of them: the Song view is about order and repeats, and
+        // nothing on it is written a step at a time.
+        if (inSong) ...[
+          const Expanded(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(8, 6, 8, 0),
+              child: SongView(),
+            ),
           ),
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
-          child: BarStrip(),
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
-          child: SubLaneView(),
-        ),
-        const SizedBox(height: 6),
+        ] else ...[
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+              child: isKit ? const KitGrid() : const ChopGrid(),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: BarStrip(),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: SubLaneView(),
+          ),
+          const SizedBox(height: 6),
+        ],
         const ActionBar(),
       ],
     );

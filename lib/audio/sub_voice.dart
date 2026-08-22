@@ -25,7 +25,23 @@ class SubVoice {
   double _low = 0;
   double _band = 0;
   double _filterF = 0.2;
+  double _closedF = 0.2;
+  double _openF = 0.2;
+  bool _accent = false;
   static const double _filterQ = 0.85;
+
+  /// How much further open an accented note sits, in cutoff multiples.
+  static const double _accentOpen = 1.8;
+
+  /// The level an accented note is played at.
+  ///
+  /// Opening the filter on its own does not read as an accent here, and
+  /// measurably goes the wrong way: this filter resonates, the core is close to
+  /// a sine, and moving the corner up takes the resonance off the low harmonics
+  /// that carry most of the note's energy. So the accent is a corner and a few
+  /// dB together, which is what an accent is on any machine that has one. It is
+  /// still one thing to the user: hold a note, it speaks.
+  static const double _accentGain = 1.35;
 
   // Amp envelope.
   static const double _attackSeconds = 0.004;
@@ -45,7 +61,10 @@ class SubVoice {
     final cutoffHz = 60.0 * math.pow(50.0, patch.cutoff).toDouble();
     // Chamberlin is only stable well below Nyquist/2.
     final safe = math.min(cutoffHz, sampleRate / 6);
-    _filterF = 2 * math.sin(math.pi * safe / sampleRate);
+    _closedF = 2 * math.sin(math.pi * safe / sampleRate);
+    final open = math.min(cutoffHz * _accentOpen, sampleRate / 6);
+    _openF = 2 * math.sin(math.pi * open / sampleRate);
+    _filterF = _accent ? _openF : _closedF;
 
     _attackStep = 1.0 / math.max(1, _attackSeconds * sampleRate);
 
@@ -63,10 +82,13 @@ class SubVoice {
   }
 
   /// Starts a note. With [glide] the pitch slides from wherever it is and the
-  /// envelope is not retriggered, which is what a tied cell means.
-  void noteOn(double frequency, {bool glide = false}) {
+  /// envelope is not retriggered, which is what a tied cell means. With
+  /// [accent] the filter opens for this note and closes again on the next one.
+  void noteOn(double frequency, {bool glide = false, bool accent = false}) {
     _targetFreq = frequency;
     _gate = true;
+    _accent = accent;
+    _filterF = accent ? _openF : _closedF;
     if (!glide) {
       _freq = frequency;
       _phase = 0;
@@ -88,6 +110,8 @@ class SubVoice {
     _phase = 0;
     _env = 0;
     _gate = false;
+    _accent = false;
+    _filterF = _closedF;
     _low = 0;
     _band = 0;
     _freq = _targetFreq;
@@ -125,7 +149,7 @@ class SubVoice {
       _env *= _releaseCoeff;
     }
 
-    return _low * _env;
+    return _low * _env * (_accent ? _accentGain : 1.0);
   }
 
   static double _tanh(double x) {

@@ -30,6 +30,22 @@ class BreakLibrary {
       bars: 1,
       credit: 'Hawkstreak, synthesised original. See LICENSING.md.',
     ),
+    BreakRef(
+      id: 'hawkstreak-steppa-170',
+      name: 'Steppa',
+      assetPath: 'assets/breaks/hawkstreak_steppa_170.wav',
+      bpm: 170,
+      bars: 1,
+      credit: 'Hawkstreak, synthesised original. See LICENSING.md.',
+    ),
+    BreakRef(
+      id: 'hawkstreak-roller-170',
+      name: 'Roller',
+      assetPath: 'assets/breaks/hawkstreak_roller_170.wav',
+      bpm: 170,
+      bars: 2,
+      credit: 'Hawkstreak, synthesised original. See LICENSING.md.',
+    ),
   ];
 
   static BreakRef get defaultBreak => bundled.first;

@@ -107,9 +107,9 @@ void main() {
         analysis: analysis,
         seed: seed,
       );
-      for (final slice in pattern.steps) {
-        if (slice == null) continue;
-        expect(slice, inInclusiveRange(0, sliceCount - 1));
+      for (final cell in pattern.steps) {
+        if (cell == null) continue;
+        expect(cell.slice, inInclusiveRange(0, sliceCount - 1));
       }
     }
   });

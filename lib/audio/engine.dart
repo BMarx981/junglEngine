@@ -13,27 +13,41 @@ class TransportState {
     this.step = 0,
     this.stepCount = 16,
     this.loopPosition = 0,
+    this.beatId = '',
+    this.entryIndex = -1,
   });
 
   final bool playing;
 
-  /// Index of the step currently sounding.
+  /// Index of the step currently sounding, within the Beat that is sounding.
+  /// In song playback that is the step of the current card, not of the whole
+  /// arrangement, so a grid can draw it without knowing what a song is.
   final int step;
   final int stepCount;
 
-  /// Position through the pattern, 0..1.
+  /// Position through the current pattern pass, 0..1.
   final double loopPosition;
+
+  /// Which Beat is sounding. Empty before anything has played.
+  final String beatId;
+
+  /// Which Song card is sounding, or -1 outside song playback.
+  final int entryIndex;
 
   TransportState copyWith({
     bool? playing,
     int? step,
     int? stepCount,
     double? loopPosition,
+    String? beatId,
+    int? entryIndex,
   }) => TransportState(
     playing: playing ?? this.playing,
     step: step ?? this.step,
     stepCount: stepCount ?? this.stepCount,
     loopPosition: loopPosition ?? this.loopPosition,
+    beatId: beatId ?? this.beatId,
+    entryIndex: entryIndex ?? this.entryIndex,
   );
 
   @override
@@ -42,10 +56,13 @@ class TransportState {
       other.playing == playing &&
       other.step == step &&
       other.stepCount == stepCount &&
-      other.loopPosition == loopPosition;
+      other.loopPosition == loopPosition &&
+      other.beatId == beatId &&
+      other.entryIndex == entryIndex;
 
   @override
-  int get hashCode => Object.hash(playing, step, stepCount, loopPosition);
+  int get hashCode =>
+      Object.hash(playing, step, stepCount, loopPosition, beatId, entryIndex);
 }
 
 /// The boundary between the app and whatever is making noise.

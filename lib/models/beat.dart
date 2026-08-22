@@ -38,7 +38,9 @@ class Beat {
     SubLane? sub,
     this.subPatch = const SubPatch(),
     this.subRootMidi = 36,
-  }) : chop = chop ?? ChopPattern.empty(bars: bars),
+    double swing = 0,
+  }) : swing = swing < 0 ? 0 : (swing > 1 ? 1 : swing),
+       chop = chop ?? ChopPattern.empty(bars: bars),
        kit = kit ?? KitPattern.empty(bars: bars),
        kitSlots = kitSlots ?? KitSlot.defaults(kitSlotCount),
        sub = sub ?? SubLane.empty(bars: bars);
@@ -70,6 +72,23 @@ class Beat {
   /// MIDI note that semitone 0 of the sub lane maps to.
   final int subRootMidi;
 
+  /// Swing, 0..1, applied to every odd sixteenth of this Beat.
+  ///
+  /// Global per Beat and nothing finer, because this is the answer to triplet
+  /// feel before triplet grids exist: one control that leans the whole pattern,
+  /// not a per step nudge. 0 is straight, 1 is a hard triplet shuffle. See
+  /// [swingOffsetFraction] for what the number means in time.
+  final double swing;
+
+  /// How far an odd step is pushed late, as a fraction of one step.
+  ///
+  /// 0.5 at full swing, which puts the offbeat two thirds of the way through
+  /// the pair: the same place a 75% swing lands on a drum machine.
+  double get swingOffsetFraction => swing * 0.5;
+
+  /// Swing as a producer reads it: 50% is straight, 75% is triplets.
+  int get swingPercent => 50 + (swing * 25).round();
+
   int get stepCount => bars * stepsPerBar;
 
   bool get isChop => machineType == MachineType.chop;
@@ -92,6 +111,7 @@ class Beat {
     List<KitSlot>? kitSlots,
     SubLane? sub,
     SubPatch? subPatch,
+    double? swing,
   }) => Beat(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -104,6 +124,7 @@ class Beat {
     sub: sub ?? this.sub,
     subPatch: subPatch ?? this.subPatch,
     subRootMidi: subRootMidi,
+    swing: swing ?? this.swing,
   );
 
   Beat withSlot(int index, KitSlot value) {
@@ -137,6 +158,7 @@ class Beat {
     'sub': sub.toJson(),
     'subPatch': subPatch.toJson(),
     'subRootMidi': subRootMidi,
+    'swing': swing,
   };
 
   static Beat fromJson(Map<String, Object?> json) {
@@ -164,6 +186,7 @@ class Beat {
       subRootMidi: json['subRootMidi'] is int
           ? json['subRootMidi']! as int
           : 36,
+      swing: json['swing'] is num ? (json['swing']! as num).toDouble() : 0,
     );
   }
 }

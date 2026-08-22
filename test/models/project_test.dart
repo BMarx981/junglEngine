@@ -5,6 +5,7 @@ import 'package:junglengine/models/kit_pattern.dart';
 import 'package:junglengine/models/machine_type.dart';
 import 'package:junglengine/models/project.dart';
 import 'package:junglengine/models/song.dart';
+import 'package:junglengine/models/step_mod.dart';
 import 'package:junglengine/models/sub_lane.dart';
 import 'package:junglengine/models/sub_patch.dart';
 
@@ -100,6 +101,135 @@ void main() {
       final pattern = ChopPattern.identity(sliceCount: 32).clampedTo(8);
       expect(pattern.sliceAt(3), 3);
       expect(pattern.sliceAt(9), isNull);
+    });
+  });
+
+  group('step modifiers', () {
+    test('a plain step is still written as a bare number', () {
+      final pattern = ChopPattern.empty().withStep(0, 7);
+      expect(pattern.toJson().first, 7);
+    });
+
+    test('a modifier round trips and a plain step has none', () {
+      final pattern = ChopPattern.empty()
+          .withStep(0, 7)
+          .withStep(1, 3)
+          .withMod(0, StepMod.reverse);
+      final restored = ChopPattern.fromJson(pattern.toJson());
+
+      expect(restored.sliceAt(0), 7);
+      expect(restored.modAt(0), StepMod.reverse);
+      expect(restored.modAt(1), StepMod.none);
+    });
+
+    test('an M1 file of bare numbers still opens', () {
+      final restored = ChopPattern.fromJson([for (var i = 0; i < 16; i++) i]);
+      expect(restored.sliceAt(9), 9);
+      expect(restored.modAt(9), StepMod.none);
+    });
+
+    test('an unknown modifier reads as plain rather than losing the slice', () {
+      final restored = ChopPattern.fromJson([
+        {'s': 4, 'm': 'wobble'},
+      ]);
+      expect(restored.sliceAt(0), 4);
+      expect(restored.modAt(0), StepMod.none);
+    });
+
+    test('an empty step has nothing to modify', () {
+      final pattern = ChopPattern.empty().withMod(0, StepMod.reverse);
+      expect(pattern.isEmpty, isTrue);
+    });
+
+    test('painting a slice over a modified step starts it clean', () {
+      final pattern = ChopPattern.empty()
+          .withStep(0, 7)
+          .withMod(0, StepMod.halfSpeed)
+          .withStep(0, 2);
+      expect(pattern.modAt(0), StepMod.none);
+    });
+
+    test('re-slicing drops a modified step that no longer exists', () {
+      final pattern = ChopPattern.empty()
+          .withStep(0, 20)
+          .withMod(0, StepMod.reverse)
+          .clampedTo(16);
+      expect(pattern.stepAt(0), isNull);
+    });
+  });
+
+  group('swing', () {
+    test('is straight by default and reads as a percentage', () {
+      final beat = Beat(id: 'b', name: 'A');
+      expect(beat.swing, 0);
+      expect(beat.swingPercent, 50);
+    });
+
+    test('full swing is a 75 percent shuffle, half a step late', () {
+      final beat = Beat(id: 'b', name: 'A', swing: 1);
+      expect(beat.swingPercent, 75);
+      expect(beat.swingOffsetFraction, 0.5);
+    });
+
+    test('clamps, and round trips through JSON', () {
+      final beat = Beat(id: 'b', name: 'A', swing: 4);
+      expect(beat.swing, 1);
+      expect(Beat.fromJson(beat.copyWith(swing: 0.4).toJson()).swing, 0.4);
+    });
+  });
+
+  group('Song', () {
+    const song = Song([
+      SongEntry(beatId: 'a', repeats: 2),
+      SongEntry(beatId: 'b'),
+      SongEntry(beatId: 'c', repeats: 4),
+    ]);
+
+    test('repeats are clamped to something a card can hold', () {
+      expect(const SongEntry(beatId: 'a', repeats: 0).repeats, 1);
+      expect(const SongEntry(beatId: 'a', repeats: 99).repeats, 16);
+    });
+
+    test('counts the passes it plays', () {
+      expect(song.totalPasses, 7);
+    });
+
+    test('moving a card puts it where it was dropped', () {
+      final moved = song.moved(0, 2);
+      expect([for (final e in moved.entries) e.beatId], ['b', 'c', 'a']);
+    });
+
+    test('removing a card leaves the rest in order', () {
+      final without = song.withoutAt(1);
+      expect([for (final e in without.entries) e.beatId], ['a', 'c']);
+    });
+
+    test('changing repeats only touches that card', () {
+      final next = song.withRepeatsAt(0, 8);
+      expect(next.entries[0].repeats, 8);
+      expect(next.entries[2].repeats, 4);
+    });
+
+    test('bars come from the Beats the cards point at', () {
+      final project = Project(
+        id: 'p',
+        name: 'p',
+        breakId: '',
+        kitId: '',
+        bpm: 170,
+        beats: [
+          Beat(id: 'a', name: 'A', bars: 2),
+          Beat(id: 'b', name: 'B', bars: 4),
+        ],
+        song: const Song([
+          SongEntry(beatId: 'a', repeats: 4),
+          SongEntry(beatId: 'b', repeats: 2),
+          // A card pointing at a Beat that is gone counts for nothing.
+          SongEntry(beatId: 'ghost', repeats: 8),
+        ]),
+      );
+      expect(project.songBars, 16);
+      expect(project.songIsPlayable, isTrue);
     });
   });
 

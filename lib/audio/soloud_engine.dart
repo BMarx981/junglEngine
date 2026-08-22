@@ -21,15 +21,15 @@ class _BlockMarker {
     required this.pushedFrame,
     required this.loopFrame,
     required this.loopFrames,
-    required this.framesPerStep,
-    required this.stepCount,
   });
 
+  /// How many frames had been pushed to the device when this block was
+  /// rendered.
   final int pushedFrame;
+
+  /// Where the timeline was at the top of the block.
   final int loopFrame;
   final int loopFrames;
-  final double framesPerStep;
-  final int stepCount;
 }
 
 class SoLoudAudioEngine implements AudioEngine {
@@ -151,20 +151,21 @@ class SoLoudAudioEngine implements AudioEngine {
 
   @override
   Future<void> setSpec(RenderSpec spec) async {
-    final previous = _spec;
     _spec = spec;
 
     final wasPlaying = _transport.value.playing;
-    if (_renderer == null || _needsFreshRenderer(previous, spec)) {
-      // Tempo, length or the break itself changed: step boundaries moved, so
-      // the renderer has to be rebuilt and the pattern starts again from the
-      // top.
+    final renderer = _renderer;
+    if (renderer == null || !renderer.canAdopt(spec)) {
+      // A different Beat, a different machine or a different break: what is
+      // sounding cannot survive the change, so the renderer is rebuilt and
+      // playback starts again from the top.
       _renderer = PatternRenderer(spec);
       if (wasPlaying) await _restartStream();
     } else {
-      // Same timeline, different notes. Swapped in under the running renderer,
-      // so painting a step does not restart the bar or cut a ringing slice.
-      _renderer!.updateSpec(spec);
+      // Swapped in under the running renderer, so painting a step, nudging a
+      // repeat count or dragging the tempo never restarts the bar or cuts a
+      // ringing slice.
+      renderer.updateSpec(spec);
     }
 
     _transport.value = _transport.value.copyWith(
@@ -172,16 +173,6 @@ class SoLoudAudioEngine implements AudioEngine {
     );
     unawaited(_ensureSliceSources());
     unawaited(_ensureKitSources());
-  }
-
-  /// Switching Beat moves everything: a different pattern, possibly a different
-  /// machine or length. Tempo is deliberately not in this list, because the
-  /// renderer retempos in place: dragging BPM slides the loop, never restarts it.
-  static bool _needsFreshRenderer(RenderSpec? a, RenderSpec b) {
-    if (a == null) return true;
-    return a.beat.id != b.beat.id ||
-        a.beat.bars != b.beat.bars ||
-        !identical(a.breakClip, b.breakClip);
   }
 
   @override
@@ -228,6 +219,7 @@ class SoLoudAudioEngine implements AudioEngine {
       playing: false,
       step: 0,
       loopPosition: 0,
+      entryIndex: -1,
     );
   }
 
@@ -276,26 +268,28 @@ class SoLoudAudioEngine implements AudioEngine {
   }
 
   /// Resolves the audible position from the marker covering [consumedFrames].
+  ///
+  /// The renderer owns the step boundaries, swing and all, so the frame is
+  /// handed back to it rather than divided by an assumed step length here.
   void _publishPlayhead(int consumedFrames) {
     while (_markers.length > 1 &&
         _markers.elementAt(1).pushedFrame <= consumedFrames) {
       _markers.removeFirst();
     }
     if (_markers.isEmpty) return;
+    final renderer = _renderer;
     final marker = _markers.first;
-    if (marker.loopFrames <= 0 || marker.framesPerStep <= 0) return;
+    if (renderer == null || marker.loopFrames <= 0) return;
 
     final into = consumedFrames - marker.pushedFrame;
-    final pos = (marker.loopFrame + into) % marker.loopFrames;
-    final step = (pos / marker.framesPerStep).floor().clamp(
-      0,
-      marker.stepCount - 1,
-    );
+    final at = renderer.positionAt(marker.loopFrame + into);
 
     _transport.value = _transport.value.copyWith(
-      step: step,
-      stepCount: marker.stepCount,
-      loopPosition: pos / marker.loopFrames,
+      step: at.step,
+      stepCount: at.stepCount,
+      loopPosition: at.position,
+      beatId: at.beatId,
+      entryIndex: at.entryIndex,
     );
   }
 
@@ -313,8 +307,6 @@ class SoLoudAudioEngine implements AudioEngine {
         pushedFrame: _framesPushed,
         loopFrame: renderer.loopFrame,
         loopFrames: renderer.loopFrames,
-        framesPerStep: renderer.framesPerStep,
-        stepCount: renderer.stepCount,
       ),
     );
     renderer.render(_block, _blockFrames);

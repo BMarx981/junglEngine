@@ -53,6 +53,45 @@ class KitLibrary {
         ),
       ],
     ),
+    KitRef(
+      id: 'hawkstreak-02',
+      name: 'Hawkstreak 02',
+      credit: 'Hawkstreak, synthesised original. See LICENSING.md.',
+      samples: [
+        KitSampleRef(
+          label: 'KICK',
+          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_kick.wav',
+        ),
+        KitSampleRef(
+          label: 'SNR',
+          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_snare.wav',
+        ),
+        KitSampleRef(
+          label: 'WOOD',
+          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_rim.wav',
+        ),
+        KitSampleRef(
+          label: 'CLAP',
+          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_clap.wav',
+        ),
+        KitSampleRef(
+          label: 'CH',
+          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_hat_closed.wav',
+        ),
+        KitSampleRef(
+          label: 'OH',
+          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_hat_open.wav',
+        ),
+        KitSampleRef(
+          label: 'TAMB',
+          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_shaker.wav',
+        ),
+        KitSampleRef(
+          label: 'TOM',
+          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_conga.wav',
+        ),
+      ],
+    ),
   ];
 
   static KitRef get defaultKit => bundled.first;

@@ -18,9 +18,11 @@ class ActionBar extends ConsumerWidget {
     final controller = ref.read(studioProvider.notifier);
     final canUndo = ref.watch(studioProvider.select((s) => s.canUndo));
     // Scramble rearranges slices of a break. A Kit Beat has no slices, and the
-    // M1 gate is about whether the Kit machine earns its place, not about
+    // M1 gate was about whether the Kit machine earns its place, not about
     // inventing a second meaning for the button.
     final isKit = ref.watch(studioProvider.select((s) => s.beat.isKit));
+    final inSong = ref.watch(studioProvider.select((s) => s.inSong));
+    final beatName = ref.watch(studioProvider.select((s) => s.beat.name));
     final transport = ref.watch(transportProvider);
 
     return Container(
@@ -42,31 +44,51 @@ class ActionBar extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Expanded(
-            child: _Action(
-              icon: Icons.shuffle,
-              label: 'SCRAMBLE',
-              enabled: !isKit,
-              color: JungleTheme.hot,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                controller.scramble();
-              },
+          // The Song view is the same instrument doing a different job, so the
+          // bar swaps what it offers rather than greying half of itself out.
+          // Play stays where it is either way.
+          if (inSong) ...[
+            Expanded(
+              flex: 2,
+              child: _Action(
+                icon: Icons.playlist_add,
+                label: 'ADD $beatName',
+                color: JungleTheme.accent,
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  controller.addToSong();
+                },
+              ),
             ),
-          ),
-          Expanded(
-            child: _Action(
-              icon: Icons.undo,
-              label: 'UNDO',
-              enabled: canUndo,
-              onTap: controller.undo,
+          ] else ...[
+            Expanded(
+              child: _Action(
+                icon: Icons.shuffle,
+                label: 'SCRAMBLE',
+                enabled: !isKit,
+                color: JungleTheme.hot,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  controller.scramble();
+                },
+              ),
             ),
-          ),
+            Expanded(
+              child: _Action(
+                icon: Icons.undo,
+                label: 'UNDO',
+                enabled: canUndo,
+                onTap: controller.undo,
+              ),
+            ),
+          ],
           Expanded(
             child: _Action(
               icon: Icons.graphic_eq,
               label: 'SUB',
               color: JungleTheme.sub,
+              // Still the open Beat's synth in the Song view, which is the
+              // right thing to reach for while an arrangement is running.
               onTap: () => SubPanel.show(context),
             ),
           ),

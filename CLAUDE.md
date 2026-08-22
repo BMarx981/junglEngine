@@ -24,6 +24,9 @@ The magic moment: drop a slice on a step, hit play, the break is rearranged and 
 - One break per project. All Chop Beats resequence the same source break. Per Beat break selection is parked, do not build it.
 - Kit machine spec (do not grow this): 8 slots, one shots only, per step velocity at three levels, per slot volume and pitch. No choke groups, no per slot effects, no more than 8 slots. Grid is 16 steps. Triplet resolutions are parked, swing covers the feel.
 - Slicing is equal division only in M0 (8, 16, 32). Transient detection is a future feature with its own branch, do not start it early.
+- Chop step modifier spec (do not grow this): reverse, retrigger, pitch down, half speed. Four, applied per step by long press. Anything else is an effect and effects are parked.
+- Swing is one control per Beat, 50 to 75 percent, and it moves the odd sixteenths. There is no per step nudge and no groove templates.
+- Song view is a list of cards with repeat counts. Not a timeline, ever. No per card mute, no automation, no arranger lanes.
 
 ## Project structure
 
@@ -38,7 +41,7 @@ The magic moment: drop a slice on a step, hit play, the break is rearranged and 
 
 ## Sub synth spec (do not grow this)
 
-Monophonic. Sine or triangle core, one lowpass, drive, amp envelope, glide. Five parameters max exposed to the user. Accent modifier opens the filter slightly. No wavetables, no mod matrix, no additional oscillators. Refuse politely and point here.
+Monophonic. Sine or triangle core, one lowpass, drive, amp envelope, glide. Five parameters max exposed to the user. Accent is a per step modifier, not a sixth knob: it opens the filter and lifts the level a few dB on that note only, because the filter alone measurably makes the note duller rather than louder. No wavetables, no mod matrix, no additional oscillators. Refuse politely and point here.
 
 ## Working rules
 

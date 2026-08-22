@@ -9,6 +9,7 @@ import 'package:junglengine/models/chop_pattern.dart';
 import 'package:junglengine/models/kit_pattern.dart';
 import 'package:junglengine/models/kit_slot.dart';
 import 'package:junglengine/models/machine_type.dart';
+import 'package:junglengine/models/step_mod.dart';
 import 'package:junglengine/models/sub_lane.dart';
 import 'package:junglengine/models/sub_patch.dart';
 
@@ -174,7 +175,7 @@ void main() {
 
     test('slices out of range are ignored rather than crashing', () {
       final spec = specFor(
-        beatWith(chop: ChopPattern(List<int?>.filled(16, 99))),
+        beatWith(chop: ChopPattern.ofSlices(List<int?>.filled(16, 99))),
       );
       expect(peakOf(renderAll(spec, 20000)), 0);
     });
@@ -486,6 +487,342 @@ void main() {
       final a = renderAll(kitSpec(beat, clips), 40000);
       final b = renderAll(kitSpec(beat, clips), 40000);
       expect(a, equals(b));
+    });
+  });
+
+  group('swing', () {
+    /// One click at the head of every slice, so a rendered onset says exactly
+    /// where a step fired.
+    AudioClip clickBreak() {
+      final frames = (sampleRate * 4 * 60 / bpm).round();
+      final samples = Float32List(frames * 2);
+      final sliceFrames = frames / sliceCount;
+      for (var f = 0; f < frames; f++) {
+        if (f % sliceFrames.round() < 300) {
+          samples[f * 2] = 0.8;
+          samples[f * 2 + 1] = 0.8;
+        }
+      }
+      return AudioClip(samples: samples, channels: 2, sampleRate: sampleRate);
+    }
+
+    final clip = clickBreak();
+
+    Beat swung(double swing) => beatWith(
+      chop: ChopPattern.empty().withStep(0, 0).withStep(1, 0),
+    ).copyWith(swing: swing);
+
+    RenderSpec spec(double swing) => specFor(swung(swing), clip: clip);
+
+    /// First frame past [from] where the mix is loud.
+    int onsetAfter(Float32List out, int from) {
+      for (var f = from; f < out.length ~/ 2; f++) {
+        if (out[f * 2].abs() > 0.4) return f;
+      }
+      return -1;
+    }
+
+    test('swing does not change how long the bar is', () {
+      expect(
+        PatternRenderer(spec(1)).loopFrames,
+        PatternRenderer(spec(0)).loopFrames,
+      );
+    });
+
+    test('the offbeat is pushed late and the downbeat is not', () {
+      final stepFrames = PatternRenderer(spec(0)).framesPerStep;
+
+      final straight = renderAll(spec(0), 40000);
+      final hard = renderAll(spec(1), 40000);
+
+      expect(onsetAfter(straight, 0), lessThan(20));
+      expect(onsetAfter(hard, 0), lessThan(20));
+
+      // Full swing puts the second sixteenth two thirds of the way through the
+      // pair, which is half a step later than straight.
+      expect(
+        onsetAfter(straight, (stepFrames * 0.5).round()),
+        closeTo(stepFrames, 30),
+      );
+      expect(
+        onsetAfter(hard, (stepFrames * 0.5).round()),
+        closeTo(stepFrames * 1.5, 30),
+      );
+    });
+
+    test('half swing lands halfway between straight and triplets', () {
+      final stepFrames = PatternRenderer(spec(0)).framesPerStep;
+      final half = renderAll(spec(0.5), 40000);
+      expect(
+        onsetAfter(half, (stepFrames * 0.5).round()),
+        closeTo(stepFrames * 1.25, 30),
+      );
+    });
+
+    test('swing can be dragged without restarting the loop', () {
+      final renderer = PatternRenderer(spec(0));
+      final before = renderer.loopFrames;
+      expect(renderer.canAdopt(spec(0.6)), isTrue);
+      renderer.updateSpec(spec(0.6));
+      expect(renderer.loopFrames, before);
+      expect(renderer.spec.beat.swing, 0.6);
+    });
+  });
+
+  group('step modifiers', () {
+    /// A break whose every slice ramps from quiet to loud, so the level of a
+    /// rendered sample says how far into its slice the read head is.
+    AudioClip rampBreak() {
+      final frames = (sampleRate * 4 * 60 / bpm).round();
+      final samples = Float32List(frames * 2);
+      final sliceFrames = frames / sliceCount;
+      for (var f = 0; f < frames; f++) {
+        final into = (f % sliceFrames) / sliceFrames;
+        final value = 0.05 + 0.9 * into;
+        samples[f * 2] = value;
+        samples[f * 2 + 1] = value;
+      }
+      return AudioClip(samples: samples, channels: 2, sampleRate: sampleRate);
+    }
+
+    /// Renders one step of a Beat holding slice 0 with [mod] on step 0, and
+    /// reports the level at [fraction] of the way through that step.
+    double levelAt(StepMod mod, double fraction) {
+      final beat = beatWith(
+        chop: ChopPattern.empty().withCell(0, ChopStep(0, mod: mod)),
+      );
+      final spec = specFor(beat, clip: rampBreak());
+      final renderer = PatternRenderer(spec);
+      final stepFrames = renderer.loopFrames ~/ 16;
+      final out = Float32List(stepFrames * 2);
+      renderer.render(out, stepFrames);
+      return out[(stepFrames * fraction).round() * 2];
+    }
+
+    test('a plain step reads the slice forwards', () {
+      expect(levelAt(StepMod.none, 0.2), lessThan(levelAt(StepMod.none, 0.8)));
+    });
+
+    test('reverse reads it backwards', () {
+      expect(
+        levelAt(StepMod.reverse, 0.2),
+        greaterThan(levelAt(StepMod.reverse, 0.8)),
+      );
+      // Backwards from the top of the slice, so early in the step is loud.
+      expect(
+        levelAt(StepMod.reverse, 0.2),
+        greaterThan(levelAt(StepMod.none, 0.2)),
+      );
+    });
+
+    test('half speed gets half as far through the slice', () {
+      final plain = levelAt(StepMod.none, 0.8);
+      final half = levelAt(StepMod.halfSpeed, 0.8);
+      expect(half, lessThan(plain));
+      // Half the distance along a straight ramp, allowing for the offset the
+      // ramp starts at.
+      expect(half - 0.05, closeTo((plain - 0.05) / 2, 0.08));
+    });
+
+    test('pitch down is slower than plain and faster than half speed', () {
+      final plain = levelAt(StepMod.none, 0.8);
+      final pitched = levelAt(StepMod.pitchDown, 0.8);
+      final half = levelAt(StepMod.halfSpeed, 0.8);
+      expect(pitched, lessThan(plain));
+      expect(pitched, greaterThan(half));
+    });
+
+    test('retrigger starts the slice again four times inside the step', () {
+      // Just after each subdivision the read head is back at the head of the
+      // slice, so the ramp is quiet again where a plain step would be loud.
+      for (final at in [0.27, 0.52, 0.77]) {
+        expect(
+          levelAt(StepMod.retrigger, at),
+          lessThan(levelAt(StepMod.none, at)),
+          reason: 'retrigger should have restarted before $at of the step',
+        );
+      }
+    });
+
+    test('a modifier does not leak onto the next step', () {
+      final beat = beatWith(
+        chop: ChopPattern.empty()
+            .withCell(0, const ChopStep(0, mod: StepMod.reverse))
+            .withStep(1, 0),
+      );
+      final spec = specFor(beat, clip: rampBreak());
+      final renderer = PatternRenderer(spec);
+      final stepFrames = renderer.loopFrames ~/ 16;
+      final out = Float32List(stepFrames * 2 * 2);
+      renderer.render(out, stepFrames * 2);
+      final first = out[(stepFrames * 0.2).round() * 2];
+      final second = out[(stepFrames * 1.2).round() * 2];
+      expect(second, lessThan(first));
+    });
+  });
+
+  group('song', () {
+    // One clip for every spec in this group: the renderer only swaps a spec in
+    // under a running playhead when the break behind it is the same object.
+    final clip = testBreak();
+    final kit = testKit();
+
+    RenderSpec songSpec(List<Beat> beats) => RenderSpec.of(
+      breakClip: clip,
+      kitClips: kit,
+      sections: [
+        for (var i = 0; i < beats.length; i++)
+          RenderSection(beat: beats[i], entryIndex: i),
+      ],
+      bpm: bpm,
+      sampleRate: sampleRate,
+    );
+
+    Beat chopBeat(String id, int slice) => Beat(
+      id: id,
+      name: id,
+      sliceCount: sliceCount,
+      chop: ChopPattern.empty().withStep(0, slice),
+      sub: SubLane.empty(),
+    );
+
+    test('the timeline is every section, end to end', () {
+      final one = PatternRenderer(specFor(beatWith())).loopFrames;
+      final renderer = PatternRenderer(
+        songSpec([chopBeat('a', 0), chopBeat('b', 1)]),
+      );
+      expect(renderer.stepCount, 32);
+      expect(renderer.loopFrames, closeTo(one * 2, 2));
+    });
+
+    test('sections play in order, across machine types', () {
+      final kit = kitBeat(
+        kit: KitPattern.empty().withCell(0, 0, KitVelocity.hard),
+      );
+      final spec = songSpec([chopBeat('a', 5), kit]);
+      final renderer = PatternRenderer(spec);
+      final barFrames = renderer.loopFrames ~/ 2;
+      final out = Float32List(renderer.loopFrames * 2);
+      renderer.render(out, renderer.loopFrames);
+
+      // First bar: slice 5 of the break. Second: slot 0 of the kit.
+      expect(
+        out[100 * 2],
+        closeTo(PatternRenderer.softClip((5 + 1) / 32.0 * 0.92), 0.01),
+      );
+      expect(
+        out[(barFrames + 100) * 2],
+        closeTo(PatternRenderer.softClip(0.5 * 0.8 * 0.92), 1e-3),
+      );
+    });
+
+    test('the playhead reports the card and the step within its Beat', () {
+      final renderer = PatternRenderer(
+        songSpec([chopBeat('a', 0), chopBeat('b', 1)]),
+      );
+      final stepFrames = renderer.framesPerStep;
+
+      final first = renderer.positionAt((stepFrames * 2).round() + 5);
+      expect(first.entryIndex, 0);
+      expect(first.beatId, 'a');
+      expect(first.step, 2);
+      expect(first.stepCount, 16);
+
+      final second = renderer.positionAt((stepFrames * 19).round() + 5);
+      expect(second.entryIndex, 1);
+      expect(second.beatId, 'b');
+      expect(second.step, 3);
+      expect(second.position, closeTo(3 / 16, 0.02));
+    });
+
+    test('a card can be added while the song plays', () {
+      final renderer = PatternRenderer(songSpec([chopBeat('a', 0)]));
+      final longer = songSpec([chopBeat('a', 0), chopBeat('b', 1)]);
+      expect(renderer.canAdopt(longer), isTrue);
+      renderer.updateSpec(longer);
+      expect(renderer.stepCount, 32);
+    });
+
+    test('a different Beat under the playhead needs a new renderer', () {
+      final renderer = PatternRenderer(songSpec([chopBeat('a', 0)]));
+      expect(renderer.canAdopt(songSpec([chopBeat('c', 0)])), isFalse);
+    });
+  });
+
+  group('sub accent', () {
+    /// How much of the signal is above the fundamental, roughly: the sum of
+    /// sample to sample movement. A more open filter passes more harmonics and
+    /// the waveform moves faster, which is what an accent sounds like.
+    double brightnessOf(bool accent) {
+      final out = renderAll(
+        specFor(
+          beatWith(
+            sub: SubLane.empty().withStep(
+              0,
+              SubStep(semitone: 0, accent: accent),
+            ),
+            patch: const SubPatch(cutoff: 0.3, decay: 0.5),
+          ),
+        ),
+        20000,
+      );
+      var sum = 0.0;
+      for (var i = 2; i < out.length; i += 2) {
+        sum += (out[i] - out[i - 2]).abs();
+      }
+      return sum;
+    }
+
+    test('an accented note opens the filter and speaks up', () {
+      expect(brightnessOf(true), greaterThan(brightnessOf(false) * 1.1));
+
+      double peakFor(bool accent) => peakOf(
+        renderAll(
+          specFor(
+            beatWith(
+              sub: SubLane.empty().withStep(
+                0,
+                SubStep(semitone: 0, accent: accent),
+              ),
+              patch: const SubPatch(cutoff: 0.3, decay: 0.5),
+            ),
+          ),
+          20000,
+        ),
+      );
+      expect(peakFor(true), greaterThan(peakFor(false)));
+    });
+
+    test('the accent does not carry into the next note', () {
+      final out = renderAll(
+        specFor(
+          beatWith(
+            sub: SubLane.empty()
+                .withStep(0, const SubStep(semitone: 0, accent: true))
+                .withStep(4, const SubStep(semitone: 0)),
+            patch: const SubPatch(cutoff: 0.3, decay: 0.2),
+          ),
+        ),
+        40000,
+      );
+      final plain = renderAll(
+        specFor(
+          beatWith(
+            sub: SubLane.empty()
+                .withStep(0, const SubStep(semitone: 0))
+                .withStep(4, const SubStep(semitone: 0)),
+            patch: const SubPatch(cutoff: 0.3, decay: 0.2),
+          ),
+        ),
+        40000,
+      );
+      // Second note in both renders is unaccented, so from there on the two
+      // have to agree.
+      final stepFrames = PatternRenderer(specFor(beatWith())).loopFrames ~/ 16;
+      final from = (stepFrames * 4 + 400) * 2;
+      for (var i = from; i < from + 2000; i++) {
+        expect(out[i], closeTo(plain[i], 1e-6));
+      }
     });
   });
 }

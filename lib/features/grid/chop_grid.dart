@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/chop_pattern.dart';
+import '../../models/step_mod.dart';
 import '../../models/steps.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
 import '../transport/playhead_painter.dart';
 import 'slice_analysis.dart';
+import 'step_mod_sheet.dart';
 
 /// The break step grid: rows are slices, columns are steps.
 ///
@@ -86,6 +90,18 @@ class _ChopGridState extends ConsumerState<ChopGrid> {
                       _lastPaintedStep = null;
                       _lastPaintedSlice = null;
                     },
+                    // Hold a cell that has something on it to reverse it,
+                    // retrigger it, pitch it down or halve its speed.
+                    onLongPressStart: (details) => _cellAt(
+                      details.localPosition,
+                      cellWidth,
+                      rowHeight,
+                      (slice, step) {
+                        if (beat.chop.sliceAt(step) != slice) return;
+                        HapticFeedback.mediumImpact();
+                        StepModSheet.show(context, step);
+                      },
+                    ),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
@@ -93,7 +109,7 @@ class _ChopGridState extends ConsumerState<ChopGrid> {
                           painter: _GridPainter(
                             steps: [
                               for (var i = 0; i < stepsPerBar; i++)
-                                beat.chop.sliceAt(windowStart + i),
+                                beat.chop.stepAt(windowStart + i),
                             ],
                             sliceCount: beat.sliceCount,
                             rowHeight: rowHeight,
@@ -224,7 +240,7 @@ class _GridPainter extends CustomPainter {
   });
 
   /// The bar on screen: one entry per column.
-  final List<int?> steps;
+  final List<ChopStep?> steps;
 
   final int sliceCount;
   final double rowHeight;
@@ -249,20 +265,22 @@ class _GridPainter extends CustomPainter {
 
     final fill = Paint()..color = JungleTheme.accent;
     for (var step = 0; step < steps.length; step++) {
-      final slice = steps[step];
-      if (slice == null || slice >= sliceCount) continue;
+      final cell = steps[step];
+      if (cell == null || cell.slice >= sliceCount) continue;
+      final rect = Rect.fromLTWH(
+        step * cellWidth + 1.5,
+        cell.slice * rowHeight + 1.5,
+        cellWidth - 3,
+        rowHeight - 3,
+      );
       canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            step * cellWidth + 1.5,
-            slice * rowHeight + 1.5,
-            cellWidth - 3,
-            rowHeight - 3,
-          ),
-          const Radius.circular(2),
-        ),
+        RRect.fromRectAndRadius(rect, const Radius.circular(2)),
         fill,
       );
+      // A modified step is the same cell with its letter cut out of it, so the
+      // pattern still reads as a pattern and the modifier reads as an edit to
+      // one hit rather than a second row of information.
+      if (!cell.mod.isNone) _paintGlyph(canvas, rect, cell.mod);
     }
 
     final thin = Paint()
@@ -290,6 +308,33 @@ class _GridPainter extends CustomPainter {
     }
   }
 
+  /// Draws the modifier's letter inside the cell, dark on the accent fill.
+  /// Skipped when the row is too short to hold a legible one: a smear of ink is
+  /// worse than no marking.
+  void _paintGlyph(Canvas canvas, Rect cell, StepMod mod) {
+    final size = (rowHeight * 0.5).clamp(0.0, cell.width * 0.8);
+    if (size < 7) return;
+    final painter = TextPainter(
+      text: TextSpan(
+        text: stepModGlyph(mod),
+        style: TextStyle(
+          color: JungleTheme.background,
+          fontSize: size,
+          height: 1,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    painter.paint(
+      canvas,
+      Offset(
+        cell.center.dx - painter.width / 2,
+        cell.center.dy - painter.height / 2,
+      ),
+    );
+  }
+
   @override
   bool shouldRepaint(_GridPainter old) =>
       old.rowHeight != rowHeight ||
@@ -297,7 +342,7 @@ class _GridPainter extends CustomPainter {
       old.rowsPerBar != rowsPerBar ||
       !_sameSteps(old.steps, steps);
 
-  static bool _sameSteps(List<int?> a, List<int?> b) {
+  static bool _sameSteps(List<ChopStep?> a, List<ChopStep?> b) {
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
       if (a[i] != b[i]) return false;

@@ -1,11 +1,15 @@
-// Generates the bundled Hawkstreak one shot kit.
+// Generates the bundled Hawkstreak one shot kits.
 //
 // Original content, synthesised from scratch, so the Kit machine has something
 // to play on day one with no sample clearance attached to it. Drop real one
-// shots into assets/kits/hawkstreak/ under the same file names to replace
-// these; nothing in the code has to change.
+// shots into assets/kits/<kit>/ under the same file names to replace these;
+// nothing in the code has to change.
 //
 //   dart run tool/make_kit.dart
+//
+// Two kits: 01 is the bright one the Kit machine shipped with, 02 is the dark
+// one. Same eight positions in both, because slots are positional and a project
+// that switches kit keeps its pattern.
 //
 // See LICENSING.md.
 
@@ -16,7 +20,6 @@ import 'dart:typed_data';
 import 'package:junglengine/audio/wav.dart';
 
 const int sampleRate = 44100;
-const String outputDir = 'assets/kits/hawkstreak';
 
 /// Peak each voice is normalised to. This is the kit's mix balance: slot volume
 /// starts at unity, so what is written here is what you hear before touching
@@ -32,24 +35,70 @@ const Map<String, double> _levels = {
   'conga': 0.72,
 };
 
-void main() {
-  final random = math.Random(1994);
-  final voices = <String, Float32List>{
-    'kick': _kick(random),
-    'snare': _snare(random),
-    'rim': _rim(random),
-    'clap': _clap(random),
-    'hat_closed': _hat(random, open: false),
-    'hat_open': _hat(random, open: true),
-    'shaker': _shaker(random),
-    'conga': _conga(random),
-  };
+/// The dark kit sits lower and quieter on top, so it can carry a busier
+/// pattern without the hats taking over.
+const Map<String, double> _darkLevels = {
+  'kick': 0.98,
+  'snare': 0.84,
+  'rim': 0.58,
+  'clap': 0.70,
+  'hat_closed': 0.36,
+  'hat_open': 0.44,
+  'shaker': 0.32,
+  'conga': 0.74,
+};
 
-  Directory(outputDir).createSync(recursive: true);
-  voices.forEach((name, voice) {
+void main() {
+  _write(
+    directory: 'assets/kits/hawkstreak',
+    prefix: 'hawkstreak',
+    levels: _levels,
+    voices: () {
+      final random = math.Random(1994);
+      return <String, Float32List>{
+        'kick': _kick(random),
+        'snare': _snare(random),
+        'rim': _rim(random),
+        'clap': _clap(random),
+        'hat_closed': _hat(random, open: false),
+        'hat_open': _hat(random, open: true),
+        'shaker': _shaker(random),
+        'conga': _conga(random),
+      };
+    },
+  );
+
+  _write(
+    directory: 'assets/kits/hawkstreak02',
+    prefix: 'hawkstreak02',
+    levels: _darkLevels,
+    voices: () {
+      final random = math.Random(2026);
+      return <String, Float32List>{
+        'kick': _deepKick(random),
+        'snare': _tightSnare(random),
+        'rim': _woodRim(random),
+        'clap': _gatedClap(random),
+        'hat_closed': _darkHat(random, open: false),
+        'hat_open': _darkHat(random, open: true),
+        'shaker': _tambourine(random),
+        'conga': _lowTom(random),
+      };
+    },
+  );
+}
+
+void _write({
+  required String directory,
+  required String prefix,
+  required Map<String, double> levels,
+  required Map<String, Float32List> Function() voices,
+}) {
+  Directory(directory).createSync(recursive: true);
+  voices().forEach((name, voice) {
     _fadeOut(voice);
-    _normalize(voice, _levels[name]!);
-    final path = '$outputDir/hawkstreak_$name.wav';
+    _normalize(voice, levels[name]!);
+    final path = '$directory/${prefix}_$name.wav';
     File(
       path,
     ).writeAsBytesSync(encodeWav(voice, sampleRate: sampleRate, channels: 1));
@@ -187,6 +236,146 @@ Float32List _conga(math.Random random) {
         math.exp(-t * 17);
     final slap = (random.nextDouble() * 2 - 1) * math.exp(-t * 420) * 0.22;
     out[i] = _tanh((body + slap) * 1.2);
+  }
+  return out;
+}
+
+// --- Kit 02: the dark one ---------------------------------------------------
+//
+// Same eight positions, further down. A longer, softer kick with no click, a
+// short flat snare, wood instead of metal, and hats with the top rolled off, so
+// a pattern that is too bright on kit 01 sits under the break on this one.
+
+Float32List _deepKick(math.Random random) {
+  final n = _frames(0.52);
+  final out = Float32List(n);
+  var phase = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    // Starts lower and falls further: this one is meant to be felt, and it is
+    // the reason the sub lane on a kit 02 Beat wants to stay out of the way.
+    final freq = 38.0 + 96.0 * math.exp(-t * 38);
+    phase += freq / sampleRate;
+    final body = math.sin(2 * math.pi * phase) * math.exp(-t * 7.5);
+    final thud = (random.nextDouble() * 2 - 1) * math.exp(-t * 240) * 0.14;
+    out[i] = _tanh((body + thud) * 1.7) * 0.95;
+  }
+  return out;
+}
+
+Float32List _tightSnare(math.Random random) {
+  final n = _frames(0.16);
+  final out = Float32List(n);
+  var hp = 0.0;
+  var previous = 0.0;
+  var lp = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    final tone = math.sin(2 * math.pi * 168 * t) * math.exp(-t * 46) * 0.5;
+    final white = random.nextDouble() * 2 - 1;
+    hp = 0.8 * (hp + white - previous);
+    previous = white;
+    // A lowpass on the noise takes the fizz off, which is what makes it sit
+    // behind a break instead of fighting the break's own snare.
+    lp += (hp - lp) * 0.35;
+    out[i] = _tanh((tone + lp * math.exp(-t * 34) * 0.8) * 1.3);
+  }
+  return out;
+}
+
+Float32List _woodRim(math.Random random) {
+  final n = _frames(0.05);
+  final out = Float32List(n);
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    final tone =
+        (math.sin(2 * math.pi * 840 * t) +
+            0.5 * math.sin(2 * math.pi * 1290 * t)) *
+        math.exp(-t * 150);
+    final knock = (random.nextDouble() * 2 - 1) * math.exp(-t * 1400) * 0.35;
+    out[i] = _tanh((tone + knock) * 1.15);
+  }
+  return out;
+}
+
+Float32List _gatedClap(math.Random random) {
+  final n = _frames(0.13);
+  final out = Float32List(n);
+  // Two bursts and a hard stop: a clap with the room cut off it, which is the
+  // sound a gate leaves behind.
+  const bursts = [0.0, 0.009];
+  var hp = 0.0;
+  var previous = 0.0;
+  var lp = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    var envelope = math.exp(-t * 46) * 0.5;
+    for (final at in bursts) {
+      if (t >= at) envelope += math.exp(-(t - at) * 300);
+    }
+    final white = random.nextDouble() * 2 - 1;
+    hp = 0.88 * (hp + white - previous);
+    previous = white;
+    lp += (hp - lp) * 0.5;
+    out[i] = _tanh(lp * envelope * 1.2);
+  }
+  return out;
+}
+
+Float32List _darkHat(math.Random random, {required bool open}) {
+  final n = _frames(open ? 0.26 : 0.04);
+  final out = Float32List(n);
+  final decay = open ? 15.0 : 150.0;
+  var hp = 0.0;
+  var previous = 0.0;
+  var lp = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    final white = random.nextDouble() * 2 - 1;
+    hp = 0.95 * (hp + white - previous);
+    previous = white;
+    // One highpass instead of two, then a lowpass over the top: a band, not a
+    // hiss.
+    lp += (hp - lp) * 0.55;
+    out[i] = lp * math.exp(-t * decay) * 0.9;
+  }
+  return out;
+}
+
+Float32List _tambourine(math.Random random) {
+  final n = _frames(0.14);
+  final out = Float32List(n);
+  var hp1 = 0.0;
+  var hp2 = 0.0;
+  var p1 = 0.0;
+  var p2 = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    final white = random.nextDouble() * 2 - 1;
+    hp1 = 0.975 * (hp1 + white - p1);
+    p1 = white;
+    hp2 = 0.975 * (hp2 + hp1 - p2);
+    p2 = hp1;
+    // Jingles rattle after the hit rather than decaying straight off it.
+    final rattle = 1 + 0.35 * math.sin(2 * math.pi * 62 * t);
+    out[i] = hp2 * rattle * math.exp(-t * 30) * 0.85;
+  }
+  return out;
+}
+
+Float32List _lowTom(math.Random random) {
+  final n = _frames(0.34);
+  final out = Float32List(n);
+  var phase = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    final freq = 104.0 + 46.0 * math.exp(-t * 60);
+    phase += freq / sampleRate;
+    final body =
+        (math.sin(2 * math.pi * phase) + 0.18 * math.sin(4 * math.pi * phase)) *
+        math.exp(-t * 11);
+    final stick = (random.nextDouble() * 2 - 1) * math.exp(-t * 500) * 0.18;
+    out[i] = _tanh((body + stick) * 1.3);
   }
   return out;
 }

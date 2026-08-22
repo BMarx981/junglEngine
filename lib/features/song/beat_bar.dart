@@ -13,7 +13,9 @@ import 'new_beat_sheet.dart';
 /// the workflow this is built around is make one, copy it, change two things.
 /// Tap a chip to open that Beat, hold one to delete it.
 ///
-/// This is the bank, not the Song. Arrangement is M2 and does not live here.
+/// This is the bank, not the Song: it is every Beat that exists, in the order
+/// they were made. The button on the left is the way over to the arrangement,
+/// which is where order and repeats are decided.
 class BeatBar extends ConsumerWidget {
   const BeatBar({super.key});
 
@@ -32,6 +34,20 @@ class BeatBar extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(8, 3, 6, 5),
       child: Row(
         children: [
+          // The way between the grid and the arrangement, and back. It sits
+          // next to the chips because the bank is the palette for both: in the
+          // Song view, tapping a chip is choosing what the ADD button adds.
+          _BankButton(
+            icon: state.inSong ? Icons.grid_on : Icons.queue_music,
+            label: state.inSong ? 'GRID' : 'SONG',
+            onTap: () {
+              HapticFeedback.selectionClick();
+              controller.setView(
+                state.inSong ? StudioView.pattern : StudioView.song,
+              );
+            },
+          ),
+          const SizedBox(width: 6),
           Expanded(
             child: ListView(
               scrollDirection: Axis.horizontal,

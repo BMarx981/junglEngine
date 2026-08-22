@@ -49,6 +49,23 @@ class Project {
     return -1;
   }
 
+  /// The Beat an entry points at, or null when it points at one that is gone.
+  Beat? beatForEntry(SongEntry entry) => beatById(entry.beatId);
+
+  /// How many bars the arrangement runs for. Entries pointing at a missing
+  /// Beat count for nothing rather than breaking the total.
+  int get songBars {
+    var bars = 0;
+    for (final entry in song.entries) {
+      final beat = beatById(entry.beatId);
+      if (beat != null) bars += beat.bars * entry.repeats;
+    }
+    return bars;
+  }
+
+  /// Whether the song has anything the sequencer could actually play.
+  bool get songIsPlayable => songBars > 0;
+
   Project copyWith({
     String? name,
     String? breakId,
@@ -76,6 +93,8 @@ class Project {
 
   /// Appends a Beat to the bank.
   Project withNewBeat(Beat beat) => copyWith(beats: [...beats, beat]);
+
+  Project withSong(Song value) => copyWith(song: value);
 
   /// Inserts a Beat straight after [afterId], which is where a duplicate
   /// belongs: next to the thing it came from.

@@ -237,4 +237,78 @@ void main() {
 
     await engine.stop();
   });
+
+  /// A two card song: a Chop Beat, then a Kit Beat.
+  Future<RenderSpec> loadedSongSpec() async {
+    final chop = await loadedSpec();
+    final kit = await loadedKitSpec();
+    return RenderSpec.of(
+      breakClip: chop.breakClip,
+      kitClips: kit.kitClips,
+      sections: [
+        RenderSection(beat: chop.beat, entryIndex: 0),
+        RenderSection(beat: kit.beat, entryIndex: 1),
+      ],
+      bpm: chop.bpm,
+      sampleRate: engine.sampleRate,
+    );
+  }
+
+  testWidgets('a song crosses from one machine to the next without a gap', (
+    tester,
+  ) async {
+    await engine.initialize();
+    await engine.setSpec(await loadedSongSpec());
+    await engine.start();
+
+    // One bar at 170 BPM is 1.41s, so this lands inside the first card.
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    final first = engine.transport.value;
+    expect(first.playing, isTrue);
+    expect(first.entryIndex, 0);
+    expect(first.beatId, 'b');
+
+    // And this lands inside the second, without the transport having stopped.
+    await Future<void>.delayed(const Duration(milliseconds: 1400));
+    final second = engine.transport.value;
+    expect(second.playing, isTrue);
+    expect(second.entryIndex, 1);
+    expect(second.beatId, 'k');
+    expect(second.step, lessThan(16));
+
+    await engine.stop();
+    expect(engine.transport.value.entryIndex, -1);
+  });
+
+  testWidgets('a card can be added while the song is playing', (tester) async {
+    final song = await loadedSongSpec();
+    await engine.initialize();
+    await engine.setSpec(song);
+    await engine.start();
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+
+    final before = engine.transport.value.loopPosition;
+    await engine.setSpec(
+      RenderSpec.of(
+        breakClip: song.breakClip,
+        kitClips: song.kitClips,
+        sections: [
+          ...song.sections,
+          RenderSection(beat: song.sections.first.beat, entryIndex: 2),
+        ],
+        bpm: song.bpm,
+        sampleRate: song.sampleRate,
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
+    // Still in the first card, still moving: adding to the end of an
+    // arrangement must not send the playhead back to the top of it.
+    final now = engine.transport.value;
+    expect(now.playing, isTrue);
+    expect(now.entryIndex, 0);
+    expect(now.loopPosition, greaterThan(before));
+
+    await engine.stop();
+  });
 }

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:junglengine/features/library/break_library.dart';
 import 'package:junglengine/models/kit_pattern.dart';
 import 'package:junglengine/models/machine_type.dart';
+import 'package:junglengine/models/step_mod.dart';
 import 'package:junglengine/models/sub_lane.dart';
 import 'package:junglengine/state/studio.dart';
 
@@ -229,6 +230,232 @@ void main() {
         closeTo(4 * 4 * 60 / 174 * 1000, 20),
       );
       await result.file.delete();
+    });
+
+    test('song mode renders the whole arrangement once', () async {
+      controller().addToSong();
+      controller().addBeat(MachineType.chop, 2);
+      controller().addToSong();
+      controller().setSongRepeats(0, 3);
+      controller().setExportMode(ExportMode.song);
+
+      final result = await controller().exportWav();
+      expect(result, isNotNull);
+      // Three passes of a one bar Beat, then one of a two bar Beat.
+      expect(result!.bars, 5);
+      expect(result.fileName, contains('5bar'));
+      expect(
+        result.duration.inMilliseconds,
+        closeTo(5 * 4 * 60 / state().project.bpm * 1000, 30),
+      );
+      await result.file.delete();
+    });
+
+    test('song mode with nothing arranged renders nothing', () async {
+      controller().setExportMode(ExportMode.song);
+      expect(await controller().exportWav(), isNull);
+      expect(state().exporting, isFalse);
+    });
+  });
+
+  group('swing', () {
+    test('is per Beat and reaches the engine', () {
+      controller().setSwing(0.6);
+      expect(engine.lastSpec!.beat.swing, closeTo(0.6, 1e-9));
+
+      controller().addBeat(MachineType.chop, 1);
+      expect(state().beat.swing, 0);
+      expect(state().project.beatById('beat-1')!.swing, closeTo(0.6, 1e-9));
+    });
+
+    test('clamps to straight and full shuffle', () {
+      controller().setSwing(-1);
+      expect(state().beat.swing, 0);
+      controller().setSwing(5);
+      expect(state().beat.swing, 1);
+      expect(state().beat.swingPercent, 75);
+    });
+  });
+
+  group('step modifiers', () {
+    test('a modifier lands on the step and reaches the engine', () {
+      controller().toggleCell(4, 2);
+      controller().setStepMod(2, StepMod.reverse);
+      expect(engine.lastSpec!.beat.chop.modAt(2), StepMod.reverse);
+      expect(engine.lastSpec!.beat.chop.sliceAt(2), 4);
+    });
+
+    test('an empty step has nothing to modify', () {
+      controller().clearStep(3);
+      controller().setStepMod(3, StepMod.retrigger);
+      expect(state().beat.chop.stepAt(3), isNull);
+    });
+
+    test('a Kit Beat has no slices to modify', () {
+      controller().addBeat(MachineType.kit, 1);
+      controller().setStepMod(0, StepMod.reverse);
+      expect(state().beat.chop.isEmpty, isTrue);
+    });
+
+    test('modifiers survive a save and load', () async {
+      controller().toggleCell(5, 6);
+      controller().setStepMod(6, StepMod.halfSpeed);
+      await controller().flushSave();
+
+      container.dispose();
+      container = await booted(FakeAudioEngine());
+      final beat = container.read(studioProvider).beat;
+      expect(beat.chop.sliceAt(6), 5);
+      expect(beat.chop.modAt(6), StepMod.halfSpeed);
+    });
+  });
+
+  group('sub accent', () {
+    test('accents a note and leaves a rest alone', () {
+      controller().setSubStep(2, -5);
+      controller().toggleAccent(2);
+      expect(engine.lastSpec!.beat.sub.stepAt(2).accent, isTrue);
+
+      controller().toggleAccent(9);
+      expect(state().beat.sub.stepAt(9).accent, isFalse);
+    });
+
+    test('toggles back off', () {
+      controller().setSubStep(2, -5);
+      controller().toggleAccent(2);
+      controller().toggleAccent(2);
+      expect(state().beat.sub.stepAt(2).accent, isFalse);
+    });
+  });
+
+  group('song', () {
+    test('starts empty and on the grid', () {
+      expect(state().song.isEmpty, isTrue);
+      expect(state().view, StudioView.pattern);
+      expect(state().playsSong, isFalse);
+    });
+
+    test('adding the open Beat builds the arrangement', () {
+      controller().addToSong();
+      controller().addBeat(MachineType.kit, 2);
+      controller().addToSong();
+
+      expect(state().song.length, 2);
+      expect(state().song.entries.first.beatId, 'beat-1');
+      expect(state().project.songBars, 3);
+    });
+
+    test('the Song view plays the arrangement, not the open Beat', () {
+      controller().addToSong();
+      controller().setSongRepeats(0, 3);
+      controller().setView(StudioView.song);
+
+      final spec = engine.lastSpec!;
+      expect(spec.isSong, isTrue);
+      expect(spec.sections, hasLength(3));
+      expect(spec.sections.first.entryIndex, 0);
+      expect(spec.bars, 3);
+    });
+
+    test('an empty song still loops what is open', () {
+      controller().setView(StudioView.song);
+      expect(state().playsSong, isFalse);
+      expect(engine.lastSpec!.isSong, isFalse);
+      expect(engine.lastSpec!.sections, hasLength(1));
+    });
+
+    test('cards can be reordered, repeated and removed', () {
+      controller().addToSong();
+      controller().addBeat(MachineType.chop, 1);
+      controller().addToSong();
+
+      controller().moveSongEntry(0, 1);
+      expect(state().song.entries.first.beatId, 'beat-2');
+
+      controller().setSongRepeats(0, 4);
+      expect(state().song.entries.first.repeats, 4);
+
+      controller().removeSongEntry(0);
+      expect(state().song.length, 1);
+      expect(state().song.entries.single.beatId, 'beat-1');
+    });
+
+    test('deleting a Beat takes its cards with it', () {
+      controller().addToSong();
+      controller().addBeat(MachineType.kit, 1);
+      controller().addToSong();
+      expect(state().song.length, 2);
+
+      controller().deleteBeat('beat-1');
+      expect(state().song.length, 1);
+      expect(state().song.entries.single.beatId, 'beat-2');
+    });
+
+    test('tapping a card opens that Beat on the grid', () {
+      controller().addBeat(MachineType.kit, 1);
+      controller().addToSong();
+      controller().selectBeat('beat-1');
+      controller().setView(StudioView.song);
+
+      controller().openBeatFromSong('beat-2');
+      expect(state().activeBeatId, 'beat-2');
+      expect(state().view, StudioView.pattern);
+    });
+
+    test('the arrangement survives a save and load', () async {
+      controller().addToSong();
+      controller().setSongRepeats(0, 6);
+      await controller().flushSave();
+
+      container.dispose();
+      container = await booted(FakeAudioEngine());
+      final song = container.read(studioProvider).song;
+      expect(song.entries.single.beatId, 'beat-1');
+      expect(song.entries.single.repeats, 6);
+    });
+  });
+
+  group('project library', () {
+    test('switching break re-slices at the same division per bar', () async {
+      controller().setSliceDivision(32);
+      expect(state().beat.sliceCount, 32 * state().breakBars);
+
+      await controller().setBreak('hawkstreak-amenish-170');
+      expect(state().breakRef.bars, 1);
+      expect(state().beat.sliceCount, 32);
+      expect(state().sliceDivision, 32);
+      expect(engine.lastSpec!.beat.sliceCount, 32);
+    });
+
+    test('switching break keeps the patterns it can', () async {
+      controller().toggleCell(3, 1);
+      await controller().setBreak('hawkstreak-roller-170');
+      expect(state().beat.chop.sliceAt(1), 3);
+      // Two bars at 16 per bar.
+      expect(state().beat.sliceCount, 32);
+    });
+
+    test('switching kit keeps the Beat settings', () async {
+      controller().addBeat(MachineType.kit, 1);
+      controller().setSlotPitch(0, -4);
+      await controller().setKit('hawkstreak-02');
+
+      expect(state().kitRef.id, 'hawkstreak-02');
+      expect(state().kitClips, hasLength(kitSlotCount));
+      expect(state().beat.slot(0).pitch, -4);
+      expect(engine.lastSpec!.kitClips, hasLength(kitSlotCount));
+    });
+
+    test('the chosen break and kit come back after a restart', () async {
+      await controller().setBreak('hawkstreak-steppa-170');
+      await controller().setKit('hawkstreak-02');
+      await controller().flushSave();
+
+      container.dispose();
+      container = await booted(FakeAudioEngine());
+      final restored = container.read(studioProvider);
+      expect(restored.breakRef.id, 'hawkstreak-steppa-170');
+      expect(restored.kitRef.id, 'hawkstreak-02');
     });
   });
 

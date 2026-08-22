@@ -41,7 +41,12 @@ here, not a sequencer.
 That is the point: there is one code path, so what you hear is what you export,
 and step timing is sample accurate instead of being at the mercy of Dart timer
 jitter. It also keeps `AudioEngine` narrow enough that the Lira Rust engine can
-replace it at M2 or M3 without the grid, the sequencer or the exporter noticing.
+replace it at M4 without the grid, the sequencer or the exporter noticing.
+
+A `RenderSpec` is a list of sections, each one a Beat's turn on the timeline.
+A pattern is one section looping; a song is one section per pass. The sequencer
+never knows which it is playing, which is what makes an arrangement seamless
+across machine types for free.
 
 - `lib/audio/engine.dart` — the interface everything else talks to
 - `lib/audio/pattern_renderer.dart` — the mixer, the only thing that makes sound
@@ -67,17 +72,56 @@ A Beat is 1, 2, 4 or 8 bars. The grid always shows one bar of sixteen steps and
 the bar strip pages between them, following the playhead while the transport
 runs. Squeezing 128 steps across a phone would make cells nobody can hit.
 
+Swing is one control per Beat, 50% to 75%, and it pushes every odd sixteenth
+late. That is the answer to triplet feel; triplet grids are parked.
+
 The open project is saved to the app documents directory as JSON, shortly after
 every edit and immediately when the app is backgrounded, and it reopens on
 launch. Local only: no cloud, no accounts, no project browser.
+
+## Step modifiers
+
+Hold a painted cell on the Chop grid to put one of four modifiers on it:
+
+| | | |
+| --- | --- | --- |
+| `R` | reverse | the slice plays backwards |
+| `4` | retrigger | the head of the slice fires four times inside the step |
+| `▼` | pitch down | a fourth down, so it is also longer |
+| `½` | half speed | an octave down, twice the length |
+
+They are per step because that is where they are heard: one reversed snare in a
+bar, not a reversed pattern. Four of them is the ceiling — anything more is an
+effect, and effects are parked.
+
+The sub lane has one modifier of its own: hold a note to accent it. An accent
+opens the filter and lifts the level a few dB, which together is what makes the
+same bassline speak over the drums.
+
+## Songs
+
+The Song view is a vertical list of cards. Each card is a Beat and a repeat
+count; drag to reorder, tap to open that Beat's grid, stepper to set repeats.
+It is a list, not a timeline: entries follow each other, nothing overlaps and
+nothing is positioned in pixels per bar.
+
+Playback in the Song view runs the whole arrangement, and the export sheet gains
+a SONG mode that renders it once through. Editing a card while the song plays
+does not restart it: the renderer swaps the new timeline in underneath the
+playhead as long as whatever is sounding is still there afterwards.
 
 ## Kits
 
 `KitLibrary.bundled` lists what ships, and a kit is exactly eight samples.
 Slots are positional: slot *n* plays sample *n*, and a Beat's per slot volume
-and pitch hang off that position. One kit per project, like the break.
+and pitch hang off that position. One kit per project, like the break, chosen
+from the library sheet behind the break name in the transport bar.
 
-The bundled kit is synthesised, not sampled, so it is guaranteed clear:
+Two kits ship: `hawkstreak-01` is the bright one, `hawkstreak-02` the dark one.
+Because slots are positional, switching kit keeps every pattern and every slot
+setting: the same programming played by different drums.
+
+The bundled kits are synthesised, not sampled, so they are guaranteed clear:
 
 ```sh
 dart run tool/make_kit.dart
@@ -85,8 +129,13 @@ dart run tool/make_kit.dart
 
 ## Breaks
 
-`BreakLibrary.bundled` lists what ships. The first entry is what a project
-opens with; there is no break picker, one break per project.
+`BreakLibrary.bundled` lists what ships. The first entry is what a new project
+opens with, and the library sheet behind the break name in the transport bar
+switches it. Still one break per project: that picks which, not how many.
+
+Switching the break keeps the patterns. Every Chop Beat is re-divided at the
+division it was already using, and any painted slice past the end of a shorter
+break is dropped.
 
 Slice divisions are **per bar**: picking 16 means sixteenth notes whether the
 break is one bar or four. So a four bar break at 16 divisions is 64 rows on the
@@ -101,8 +150,8 @@ To add a break: drop the WAV into `assets/breaks/`, add a `BreakRef` to
 `BreakLibrary.bundled`, and add a row to [LICENSING.md](LICENSING.md). 8, 16,
 24 and 32 bit PCM and float WAVs all decode, mono or stereo, any sample rate.
 
-The synthesised fallback break is generated, not sampled, so it is guaranteed
-clear:
+The Hawkstreak breaks — Amenish, Steppa and the two bar Roller — are generated,
+not sampled, so they are guaranteed clear:
 
 ```sh
 dart run tool/make_break.dart
