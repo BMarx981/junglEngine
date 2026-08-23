@@ -1,0 +1,448 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "junglEngine",
+  "@appTitle": {
+    "description": "The app name. A wordmark: do not translate or transliterate in any locale."
+  },
+
+  "barCount": "{count, plural, =1{1 BAR} other{{count} BARS}}",
+  "@barCount": {
+    "description": "A count of musical bars, in the uppercase label register used across the app chrome. Appears in the transport bar, the song view, the beat bar and the library. Fits about 12 characters.",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "barCountSentence": "{count, plural, =1{1 bar} other{{count} bars}}",
+  "@barCountSentence": {
+    "description": "The same count of musical bars in the sentence case register used for body copy under the export options. Keep this consistent with barCount; the only difference is capitalisation. In languages without letter case the two are identical.",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "barUnit": "{count, plural, =1{BAR} other{BARS}}",
+  "@barUnit": {
+    "description": "Just the unit BAR or BARS with no number, because the number is drawn separately and much larger beneath it. Used on the length chips when creating a beat. Fits 6 characters.",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "cardCount": "{count, plural, =1{1 CARD} other{{count} CARDS}}",
+  "@cardCount": {
+    "description": "A count of cards in the song arrangement. A card is one entry in the arrangement list. Uppercase label register. Fits about 12 characters.",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "beatLabel": "BEAT {name}",
+  "@beatLabel": {
+    "description": "Names a beat, where the name is a short generated identifier like A, B or C2. Uppercase label register.",
+    "placeholders": { "name": { "type": "String" } }
+  },
+
+  "studioLoadingBreak": "LOADING BREAK",
+  "@studioLoadingBreak": {
+    "description": "Shown centred on screen while the audio for the drum break loads at startup. A break is a sampled drum loop. Uppercase label register."
+  },
+  "studioEngineFailed": "AUDIO ENGINE FAILED",
+  "@studioEngineFailed": {
+    "description": "Shown centred on screen when audio could not start at all, which means the app cannot be used. Uppercase label register."
+  },
+
+  "transportClear": "CLEAR",
+  "@transportClear": {
+    "description": "Button that erases the pattern currently on screen. Top right of the transport bar. Fits 8 characters."
+  },
+  "transportArrangement": "ARRANGEMENT",
+  "@transportArrangement": {
+    "description": "Small heading over a bar count, shown while the song arrangement is open. Fits 12 characters."
+  },
+  "barStripLabel": "BAR",
+  "@barStripLabel": {
+    "description": "Legend to the left of the numbered bar buttons that page through a multi bar pattern. Very tight: fits 4 characters."
+  },
+
+  "actionAddBeat": "ADD {name}",
+  "@actionAddBeat": {
+    "description": "Button that appends the open beat to the song arrangement, where name is a short identifier like A or B. Fits 10 characters including the name.",
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "actionScramble": "SCRAMBLE",
+  "@actionScramble": {
+    "description": "Button that randomly rearranges the slices on the grid. The signature action of the app. One of five buttons sharing the screen width, so it must be short: 9 characters."
+  },
+  "actionUndo": "UNDO",
+  "@actionUndo": {
+    "description": "Button that reverts the last scramble. One of five buttons sharing the screen width. Fits 7 characters."
+  },
+  "actionExport": "EXPORT",
+  "@actionExport": {
+    "description": "Button that opens the export options. One of five buttons sharing the screen width. Fits 8 characters."
+  },
+
+  "beatBarSong": "SONG",
+  "@beatBarSong": {
+    "description": "Button that switches from the pattern grid to the song arrangement. Fits 7 characters."
+  },
+  "beatBarGrid": "GRID",
+  "@beatBarGrid": {
+    "description": "Button that switches from the song arrangement back to the pattern grid. Fits 7 characters."
+  },
+  "beatBarDup": "DUP",
+  "@beatBarDup": {
+    "description": "Button that duplicates the open beat. Deliberately abbreviated from duplicate because the button is tiny: 5 characters maximum."
+  },
+  "beatBarNew": "NEW",
+  "@beatBarNew": {
+    "description": "Button that creates a new beat. Fits 5 characters."
+  },
+  "beatBarDelete": "DELETE BEAT",
+  "@beatBarDelete": {
+    "description": "Confirmation button that deletes the beat the user is holding. Uppercase label register."
+  },
+
+  "newBeatTitle": "NEW BEAT",
+  "@newBeatTitle": {
+    "description": "Heading of the sheet for creating a beat. A beat is one pattern in the project."
+  },
+  "newBeatMachine": "MACHINE",
+  "@newBeatMachine": {
+    "description": "Heading over the choice of machine type for a new beat. Machine here means the kind of instrument: a break resequencer or a drum machine."
+  },
+  "newBeatChopDetail": "RESEQUENCE THE BREAK",
+  "@newBeatChopDetail": {
+    "description": "Explains the CHOP machine, under its name. Break means the sampled drum loop. Keep CHOP itself in English; it is not in this string. Fits about 22 characters."
+  },
+  "newBeatKitDetail": "EIGHT ONE SHOTS",
+  "@newBeatKitDetail": {
+    "description": "Explains the KIT machine, under its name. A one shot is a single drum sample triggered once, not looped. Fits about 22 characters."
+  },
+  "newBeatLength": "LENGTH",
+  "@newBeatLength": {
+    "description": "Heading over the choice of how many bars long the new beat is."
+  },
+  "newBeatCreate": "CREATE",
+  "@newBeatCreate": {
+    "description": "Button that confirms creating the new beat."
+  },
+
+  "songTitle": "SONG",
+  "@songTitle": {
+    "description": "Heading of the song arrangement view."
+  },
+  "songEmpty": "NOTHING ARRANGED YET\n\nADD THE BEAT YOU HAVE OPEN FROM THE BAR BELOW, THEN SET HOW MANY TIMES IT REPEATS",
+  "@songEmpty": {
+    "description": "Shown in the middle of an empty song arrangement, explaining how to start one. The blank line between the two sentences must be preserved. This string is allowed to wrap onto several lines."
+  },
+  "libraryBreak": "BREAK",
+  "@libraryBreak": {
+    "description": "Heading over the list of drum breaks to choose from. A break is a sampled drum loop."
+  },
+  "libraryYours": "YOURS",
+  "@libraryYours": {
+    "description": "Marks the break the user imported themselves, as opposed to the ones bundled with the app. Fits 8 characters."
+  },
+  "libraryImportFirst": "IMPORT YOUR OWN",
+  "@libraryImportFirst": {
+    "description": "Button to import an audio file as a break, shown when the user has not imported one yet."
+  },
+  "libraryImportAnother": "IMPORT ANOTHER",
+  "@libraryImportAnother": {
+    "description": "Button to import an audio file as a break, shown when the user already has one imported."
+  },
+  "libraryNote": "ONE BREAK AND ONE KIT PER PROJECT. CHANGING THE BREAK KEEPS YOUR PATTERNS.",
+  "@libraryNote": {
+    "description": "Explains at the foot of the library sheet that a project holds a single break and a single kit, and that swapping the break does not destroy the user's work. Keep KIT in English. This string is allowed to wrap."
+  },
+
+  "exportTitleWav": "EXPORT WAV",
+  "@exportTitleWav": {
+    "description": "Heading of the export sheet when exporting audio. Keep WAV in English: it is a file format."
+  },
+  "exportTitleParts": "EXPORT PARTS",
+  "@exportTitleParts": {
+    "description": "Heading of the export sheet when exporting the separate parts, meaning a MIDI file plus the individual samples, rather than one mixed audio file."
+  },
+  "exportModeLoop": "LOOP",
+  "@exportModeLoop": {
+    "description": "Export option: render the open beat looping. Fits 8 characters."
+  },
+  "exportModeSong": "SONG",
+  "@exportModeSong": {
+    "description": "Export option: render the whole song arrangement. Fits 8 characters."
+  },
+  "exportModeParts": "PARTS",
+  "@exportModeParts": {
+    "description": "Export option: render a MIDI file plus the samples, rather than mixed audio. Fits 8 characters."
+  },
+  "exportMidiSlices": "MIDI + SLICES",
+  "@exportMidiSlices": {
+    "description": "Detail under the PARTS export option naming what it produces. Keep MIDI in English. Slices are the pieces the break was cut into."
+  },
+  "exportNothingArranged": "NOTHING ARRANGED",
+  "@exportNothingArranged": {
+    "description": "Shown as the detail under the SONG export option when the arrangement is empty, so there is nothing to export."
+  },
+  "exportRepeats": "REPEATS",
+  "@exportRepeats": {
+    "description": "Heading over the choice of how many times the loop repeats in the exported file."
+  },
+  "exportRender": "RENDER AND SHARE",
+  "@exportRender": {
+    "description": "Main button that renders the audio and opens the system share sheet."
+  },
+  "exportBuild": "BUILD AND SHARE",
+  "@exportBuild": {
+    "description": "Main button that builds the MIDI and samples archive and opens the system share sheet."
+  },
+  "exportSongDetail": "The whole arrangement, {bars} at {bpm} BPM, 44.1 kHz 16 bit",
+  "@exportSongDetail": {
+    "description": "Body copy describing what the song export will produce. Sentence case, not uppercase. The bars placeholder already contains its number and unit. Keep BPM, kHz and bit in English: they are technical units.",
+    "placeholders": {
+      "bars": { "type": "String" },
+      "bpm": { "type": "int" }
+    }
+  },
+  "exportLoopDetail": "{bars} at {bpm} BPM, 44.1 kHz 16 bit",
+  "@exportLoopDetail": {
+    "description": "Body copy describing what the loop export will produce. Sentence case. The bars placeholder already contains its number and unit. Keep BPM, kHz and bit in English.",
+    "placeholders": {
+      "bars": { "type": "String" },
+      "bpm": { "type": "int" }
+    }
+  },
+  "exportPartsDetail": "Beat {name} as a MIDI file and the {content} it plays, mapped from note {note} for Kong and NN-XT",
+  "@exportPartsDetail": {
+    "description": "Body copy describing what the parts export will produce. Sentence case. Keep MIDI, Kong and NN-XT in English: Kong and NN-XT are names of samplers in the music program Reason. The note placeholder is a MIDI note number, so it is a bare number like 36.",
+    "placeholders": {
+      "name": { "type": "String" },
+      "content": { "type": "String" },
+      "note": { "type": "int" }
+    }
+  },
+  "exportPartsKit": "kit",
+  "@exportPartsKit": {
+    "description": "Substituted into exportPartsDetail as the content placeholder when the beat uses the drum machine, giving 'and the kit it plays'. Sentence case, lowercase inside a sentence."
+  },
+  "exportPartsSlices": "slices",
+  "@exportPartsSlices": {
+    "description": "Substituted into exportPartsDetail as the content placeholder when the beat uses the break resequencer, giving 'and the slices it plays'. Sentence case, lowercase inside a sentence."
+  },
+  "exportFailed": "Export failed",
+  "@exportFailed": {
+    "description": "Brief message shown in a toast when rendering or sharing did not work. Sentence case."
+  },
+
+  "stepModStep": "STEP {number}",
+  "@stepModStep": {
+    "description": "Heading of the sheet for editing one step of the pattern, where number counts from 1. A step is one cell in the sequencer grid.",
+    "placeholders": { "number": { "type": "int" } }
+  },
+  "stepModEmpty": "EMPTY",
+  "@stepModEmpty": {
+    "description": "Shown under the step heading when that step has nothing on it."
+  },
+  "stepModPlain": "PLAIN",
+  "@stepModPlain": {
+    "description": "The default step treatment: play the slice normally, with none of the four effects applied. Fits about 10 characters."
+  },
+  "stepModReverse": "REVERSE",
+  "@stepModReverse": {
+    "description": "Step treatment that plays the slice backwards. Fits about 10 characters."
+  },
+  "stepModRetrig": "RETRIG",
+  "@stepModRetrig": {
+    "description": "Step treatment that retriggers the slice several times rapidly within the step, a stutter. Abbreviated from retrigger. Fits about 10 characters."
+  },
+  "stepModPitchDown": "PITCH DOWN",
+  "@stepModPitchDown": {
+    "description": "Step treatment that lowers the pitch of the slice. Fits about 12 characters."
+  },
+  "stepModHalfSpeed": "HALF SPEED",
+  "@stepModHalfSpeed": {
+    "description": "Step treatment that plays the slice at half speed, which also lowers its pitch. Fits about 12 characters."
+  },
+
+  "kitHint": "HOLD A PAD FOR VOL AND PITCH",
+  "@kitHint": {
+    "description": "Hint above the drum machine grid telling the user that a long press on a pad opens its settings. Keep VOL and PITCH in English: they label the two controls it opens, which stay in English. A pad is one drum sound's row."
+  },
+  "kitSlot": "SLOT {number}",
+  "@kitSlot": {
+    "description": "Heading of the sheet for one drum machine slot, where number counts from 1. A slot holds one drum sample.",
+    "placeholders": { "number": { "type": "int" } }
+  },
+  "kitImportOneShot": "IMPORT ONE SHOT",
+  "@kitImportOneShot": {
+    "description": "Button to import the user's own audio file into this drum slot. A one shot is a single drum sample triggered once, not looped."
+  },
+  "kitImportOneShotPro": "IMPORT ONE SHOT  (PRO)",
+  "@kitImportOneShotPro": {
+    "description": "The same button when the user has not bought Pro, so pressing it opens the paywall. Keep PRO in English: it is the product name. The double space before the bracket is intentional."
+  },
+  "kitReplace": "REPLACE",
+  "@kitReplace": {
+    "description": "Button to swap the sample already in this drum slot for a different imported one."
+  },
+  "kitUseKitSample": "USE KIT SAMPLE",
+  "@kitUseKitSample": {
+    "description": "Button that reverts this slot to the sample that came with the bundled kit, discarding the imported one."
+  },
+
+  "subTitle": "SUB SYNTH",
+  "@subTitle": {
+    "description": "Heading of the bass synthesiser panel. Sub is short for sub bass, the very low bass line. Keep SUB in English: it labels the lane elsewhere in the app."
+  },
+  "subClearLane": "CLEAR LANE",
+  "@subClearLane": {
+    "description": "Button that erases every bass note. A lane is the horizontal track the notes sit in."
+  },
+  "subHint": "DRAG PITCH HOLD ACCENT",
+  "@subHint": {
+    "description": "Hint above the bass lane: dragging a column changes the note's pitch, and holding it adds an accent, which is a louder and brighter note. Keep PITCH in English. Very tight, fits about 24 characters."
+  },
+
+  "importTitle": "IMPORT BREAK",
+  "@importTitle": {
+    "description": "Heading of the screen for turning an imported audio file into a usable drum break."
+  },
+  "importBars": "BARS",
+  "@importBars": {
+    "description": "Heading over the control for how many musical bars long the imported audio is. Fits 8 characters."
+  },
+  "importTempo": "TEMPO",
+  "@importTempo": {
+    "description": "Heading over the tempo controls for the imported audio. Fits 8 characters."
+  },
+  "importPreviewLoop": "PREVIEW LOOP",
+  "@importPreviewLoop": {
+    "description": "Button that plays the trimmed audio round in a loop so the user can check the trim is right."
+  },
+  "importStop": "STOP",
+  "@importStop": {
+    "description": "Button that stops the preview playback. Replaces PREVIEW LOOP while playing."
+  },
+  "importTap": "TAP",
+  "@importTap": {
+    "description": "Button the user taps in time with the music to set the tempo. Fits 10 characters."
+  },
+  "importTapCount": "TAP {count}",
+  "@importTapCount": {
+    "description": "The tap tempo button once tapping has started, showing how many taps have been counted so far. Fits 10 characters including the number.",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "importUseBreak": "USE THIS BREAK",
+  "@importUseBreak": {
+    "description": "Button that accepts the imported audio and loads it into the project as the break."
+  },
+  "importTooFast": "THAT IS {bpm} BPM AT {bars}. TRY A DIFFERENT BAR COUNT.",
+  "@importTooFast": {
+    "description": "Warning shown when the chosen bar count produces an implausible tempo, which usually means the user picked the wrong number of bars. The bars placeholder already contains its number and unit. Keep BPM in English.",
+    "placeholders": {
+      "bpm": { "type": "int" },
+      "bars": { "type": "String" }
+    }
+  },
+  "importTruncated": "THAT FILE WAS LONGER THAN THE IMPORT LIMIT AND WAS CUT SHORT.",
+  "@importTruncated": {
+    "description": "Warning that the imported audio exceeded the maximum length the app accepts, so only the beginning was kept. This string is allowed to wrap."
+  },
+  "importFailed": "Import failed",
+  "@importFailed": {
+    "description": "Brief message shown in a toast when importing an audio file did not work. Sentence case."
+  },
+  "importErrorPicker": "Could not open the file picker.",
+  "@importErrorPicker": {
+    "description": "Error shown when the system file browser would not open, so the user cannot choose a file. Sentence case."
+  },
+  "importErrorDecode": "That file would not decode.",
+  "@importErrorDecode": {
+    "description": "Error shown when the chosen file is not audio the app can read, for example a damaged or unsupported format. Sentence case."
+  },
+  "importErrorTooShort": "That file is too short to chop.",
+  "@importErrorTooShort": {
+    "description": "Error shown when the chosen audio is too brief to cut into slices. Chop means to cut into pieces. Sentence case."
+  },
+
+  "proTitle": "JUNGLENGINE PRO",
+  "@proTitle": {
+    "description": "Heading of the purchase screen. Both words are the product name: do not translate. Present only so the app name can be cased consistently."
+  },
+  "proTagline": "ONE PURCHASE. NO SUBSCRIPTION. NO ADS.",
+  "@proTagline": {
+    "description": "Sits under the Pro heading and promises a single payment rather than a recurring one, and no advertising. Three short sentences."
+  },
+  "proFreeHeader": "ALREADY FREE, AND STAYING FREE",
+  "@proFreeHeader": {
+    "description": "Heading over the list of features that are not behind the paywall and never will be. The tone is a reassurance, not a sales pitch."
+  },
+  "proRestore": "RESTORE PURCHASE",
+  "@proRestore": {
+    "description": "Button that recovers a purchase the user already made, for example on a new device. This is standard app store wording: match the platform's usual phrasing in your language."
+  },
+  "proDebugUnlock": "DEBUG: UNLOCK WITHOUT BUYING",
+  "@proDebugUnlock": {
+    "description": "Developer only button, never visible in a released build. Translating it is optional."
+  },
+  "proHavePro": "YOU HAVE PRO",
+  "@proHavePro": {
+    "description": "State of the purchase button once the user owns Pro. Keep PRO in English: it is the product name."
+  },
+  "proWaiting": "WAITING FOR THE STORE",
+  "@proWaiting": {
+    "description": "State of the purchase button while the app store processes the payment. Store means the platform's app store."
+  },
+  "proChecking": "CHECKING",
+  "@proChecking": {
+    "description": "State of the purchase button while the app verifies what the user owns."
+  },
+  "proUnavailableNow": "NOT AVAILABLE RIGHT NOW",
+  "@proUnavailableNow": {
+    "description": "State of the purchase button when the app store did not return a price, so buying cannot be attempted."
+  },
+  "proGet": "GET PRO  {price}",
+  "@proGet": {
+    "description": "The purchase button in its normal state. The price arrives already formatted and localised by the app store, so leave it alone. Keep PRO in English. The double space is intentional.",
+    "placeholders": { "price": { "type": "String" } }
+  },
+  "proPurchasesOff": "PURCHASES ARE OFF ON THIS DEVICE",
+  "@proPurchasesOff": {
+    "description": "State of the purchase button when in app purchases are disabled on the device, for example by parental controls."
+  },
+  "proPurchaseFailed": "The purchase did not go through.",
+  "@proPurchaseFailed": {
+    "description": "Shown under the purchase button when the payment failed for a reason the store did not explain. Sentence case."
+  },
+  "proFeatureImportTitle": "IMPORT YOUR OWN AUDIO",
+  "@proFeatureImportTitle": {
+    "description": "Name of the first Pro feature: bringing in the user's own sound files."
+  },
+  "proFeatureImportDetail": "Any break, any one shot, from Files, iCloud, Drive or a message. Trim it, tap the tempo, chop it.",
+  "@proFeatureImportDetail": {
+    "description": "Describes the import feature. Sentence case. Files, iCloud and Drive are product names: keep them in English. A break is a drum loop, a one shot is a single drum sample. Chop means cut into slices."
+  },
+  "proFeatureMidiTitle": "MIDI AND SLICES EXPORT",
+  "@proFeatureMidiTitle": {
+    "description": "Name of the second Pro feature. Keep MIDI in English. Slices are the pieces the break was cut into."
+  },
+  "proFeatureMidiDetail": "The beat as a MIDI file and the samples it plays, mapped to drop straight into Kong or NN-XT.",
+  "@proFeatureMidiDetail": {
+    "description": "Describes the MIDI export feature. Sentence case. Keep MIDI, Kong and NN-XT in English: Kong and NN-XT are samplers in the music program Reason."
+  },
+  "proFeaturePacksTitle": "SLICE PACKS",
+  "@proFeaturePacksTitle": {
+    "description": "Name of the third Pro feature: collections of breaks and drum kits sold or included later."
+  },
+  "proFeaturePacksDetail": "Breaks and kits made for this, as they land.",
+  "@proFeaturePacksDetail": {
+    "description": "Describes the slice packs feature. Sentence case. 'As they land' means as they are released over time; it is deliberately casual."
+  },
+  "proFreeBundled": "Every bundled break and kit",
+  "@proFreeBundled": {
+    "description": "One item in the list of things that stay free. Bundled means shipped with the app. Sentence case."
+  },
+  "proFreeMachines": "Both machines, the whole grid, the sub lane",
+  "@proFreeMachines": {
+    "description": "One item in the list of things that stay free. The two machines are the break resequencer and the drum machine; the sub lane is the bass track. Sentence case."
+  },
+  "proFreeSongs": "Songs and WAV export",
+  "@proFreeSongs": {
+    "description": "One item in the list of things that stay free. Keep WAV in English: it is a file format. Sentence case."
+  },
+  "proFreeNoAds": "No ads, ever",
+  "@proFreeNoAds": {
+    "description": "One item in the list of things that stay free. Ads means advertising. Sentence case."
+  }
+}

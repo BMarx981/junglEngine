@@ -41,14 +41,34 @@ class ImportCandidate {
       Duration(microseconds: (frames * 1000000 / clip.sampleRate).round());
 }
 
+/// Why an import could not go ahead.
+///
+/// A code rather than a sentence, because these are raised deep in the import
+/// path where there is no [BuildContext] to translate against. The wording
+/// lives in `importFailureMessage`, beside the widgets that show it.
+enum ImportFailure {
+  /// The system file browser would not open.
+  picker,
+
+  /// The file is not audio this app can read.
+  decode,
+
+  /// The audio is too brief to cut into slices.
+  tooShort,
+}
+
 /// Thrown when the user picked something that is not usable audio.
 class ImportException implements Exception {
-  ImportException(this.message);
+  ImportException(this.failure, {this.detail});
 
-  final String message;
+  final ImportFailure failure;
+
+  /// The underlying platform error, for logs. Never shown to the user: it is
+  /// untranslated, and usually a stack fragment.
+  final String? detail;
 
   @override
-  String toString() => message;
+  String toString() => detail == null ? '$failure' : '$failure ($detail)';
 }
 
 /// Opens the system picker.
@@ -64,7 +84,7 @@ Future<PlatformFile?> chooseAudioFile() async {
   try {
     return await FilePicker.pickFile(type: FileType.audio);
   } on Object catch (error) {
-    throw ImportException('Could not open the file picker ($error)');
+    throw ImportException(ImportFailure.picker, detail: '$error');
   }
 }
 
@@ -113,12 +133,12 @@ Future<ImportCandidate> decodeImportedPath(
   try {
     decoded = await decodeImport(path);
   } on ImportDecodeException catch (error) {
-    throw ImportException('That file would not decode: ${error.message}');
+    throw ImportException(ImportFailure.decode, detail: error.message);
   }
 
   final clip = decoded.clip.toStereo().resampledTo(sampleRate);
   if (clip.frames < _minimumFrames) {
-    throw ImportException('That file is too short to chop.');
+    throw ImportException(ImportFailure.tooShort);
   }
   return ImportCandidate(name: name, clip: clip, truncated: decoded.truncated);
 }

@@ -1,10 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../models/beat.dart';
 import '../../models/machine_type.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
+
+/// What a machine is called on screen.
+///
+/// CHOP and KIT stay English in every locale: they name the two instruments the
+/// way a hardware box names its modes. The reason this is a function rather
+/// than a getter on [MachineType] is that the enum's `name` is the value
+/// written into saved projects, and display must never be able to drag
+/// serialisation along with it.
+String machineTypeLabel(MachineType type) => switch (type) {
+  MachineType.chop => 'CHOP',
+  MachineType.kit => 'KIT',
+};
 
 /// The two choices that are fixed for a Beat's lifetime: which machine it runs
 /// and how long it is.
@@ -39,16 +52,22 @@ class _NewBeatSheetState extends ConsumerState<NewBeatSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('NEW BEAT', style: Theme.of(context).textTheme.labelMedium),
+            Text(
+              context.l10n.newBeatTitle,
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
             const SizedBox(height: 14),
-            Text('MACHINE', style: Theme.of(context).textTheme.labelSmall),
+            Text(
+              context.l10n.newBeatMachine,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
             const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
                   child: _Choice(
-                    label: 'CHOP',
-                    detail: 'RESEQUENCE THE BREAK',
+                    label: machineTypeLabel(MachineType.chop),
+                    detail: context.l10n.newBeatChopDetail,
                     selected: _machine == MachineType.chop,
                     onTap: () => setState(() => _machine = MachineType.chop),
                   ),
@@ -56,8 +75,8 @@ class _NewBeatSheetState extends ConsumerState<NewBeatSheet> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _Choice(
-                    label: 'KIT',
-                    detail: 'EIGHT ONE SHOTS',
+                    label: machineTypeLabel(MachineType.kit),
+                    detail: context.l10n.newBeatKitDetail,
                     selected: _machine == MachineType.kit,
                     onTap: () => setState(() => _machine = MachineType.kit),
                   ),
@@ -65,17 +84,20 @@ class _NewBeatSheetState extends ConsumerState<NewBeatSheet> {
               ],
             ),
             const SizedBox(height: 14),
-            Text('LENGTH', style: Theme.of(context).textTheme.labelSmall),
+            Text(
+              context.l10n.newBeatLength,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
             const SizedBox(height: 6),
             Row(
               children: [
                 for (final bars in allowedBarLengths)
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsetsDirectional.only(end: 8),
                       child: _Choice(
                         label: '$bars',
-                        detail: bars == 1 ? 'BAR' : 'BARS',
+                        detail: context.l10n.barUnit(bars),
                         selected: bars == _bars,
                         onTap: () => setState(() => _bars = bars),
                       ),
@@ -98,11 +120,13 @@ class _NewBeatSheetState extends ConsumerState<NewBeatSheet> {
                   ref.read(studioProvider.notifier).addBeat(_machine, _bars);
                   Navigator.of(context).pop();
                 },
-                child: const Text(
-                  'CREATE',
+                child: Text(
+                  context.l10n.newBeatCreate,
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 1,
+                    letterSpacing: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.letterSpacing,
                   ),
                 ),
               ),

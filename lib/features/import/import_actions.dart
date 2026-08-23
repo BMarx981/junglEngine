@@ -1,12 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
 import '../pro/paywall.dart';
 import '../pro/pro_controller.dart';
 import 'audio_import.dart';
 import 'break_import_screen.dart';
+
+/// What to tell the user about an import that did not work.
+///
+/// The failure travels up from the decode as a code, not a sentence, because
+/// nothing down there can reach a [BuildContext]. This is where it becomes
+/// words, and the only place it should.
+String importFailureMessage(AppLocalizations l10n, ImportFailure failure) =>
+    switch (failure) {
+      ImportFailure.picker => l10n.importErrorPicker,
+      ImportFailure.decode => l10n.importErrorDecode,
+      ImportFailure.tooShort => l10n.importErrorTooShort,
+    };
 
 /// The two ways audio gets into a project, from the buttons that start them.
 ///
@@ -43,6 +56,7 @@ Future<bool> requirePro(BuildContext context, WidgetRef ref) async {
 /// which is the only confirmation this needs.
 Future<bool> importSlot(BuildContext context, WidgetRef ref, int slot) async {
   final messenger = ScaffoldMessenger.of(context);
+  final l10n = context.l10n;
   if (!await requirePro(context, ref)) return false;
   if (!context.mounted) return false;
   final candidate = await _pickAndDecode(context, ref);
@@ -51,7 +65,8 @@ Future<bool> importSlot(BuildContext context, WidgetRef ref, int slot) async {
     await ref.read(studioProvider.notifier).importSlotSample(slot, candidate);
     return true;
   } on Object catch (error) {
-    messenger.showSnackBar(SnackBar(content: Text('Import failed: $error')));
+    messenger.showSnackBar(SnackBar(content: Text(l10n.importFailed)));
+    debugPrint('junglengine: slot import failed ($error)');
     return false;
   }
 }
@@ -65,9 +80,10 @@ Future<ImportCandidate?> _pickAndDecode(
   WidgetRef ref,
 ) async {
   final messenger = ScaffoldMessenger.of(context);
+  final l10n = context.l10n;
   final sampleRate = ref.read(audioEngineProvider).sampleRate;
 
-  final picked = await _guarded(messenger, chooseAudioFile);
+  final picked = await _guarded(messenger, l10n, chooseAudioFile);
   if (picked == null || !context.mounted) return null;
 
   // An overlay entry rather than a dialog. Putting it up and taking it down are
@@ -80,6 +96,7 @@ Future<ImportCandidate?> _pickAndDecode(
   try {
     return await _guarded(
       messenger,
+      l10n,
       () => decodePicked(picked, sampleRate: sampleRate),
     );
   } finally {
@@ -94,15 +111,22 @@ Future<ImportCandidate?> _pickAndDecode(
 /// next moves.
 Future<T?> _guarded<T>(
   ScaffoldMessengerState messenger,
+  AppLocalizations l10n,
   Future<T?> Function() action,
 ) async {
   try {
     return await action();
   } on ImportException catch (error) {
-    messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    messenger.showSnackBar(
+      SnackBar(content: Text(importFailureMessage(l10n, error.failure))),
+    );
+    debugPrint('junglengine: import failed ($error)');
     return null;
   } on Object catch (error) {
-    messenger.showSnackBar(SnackBar(content: Text('Import failed: $error')));
+    // Deliberately not interpolated into the message: it is an untranslated
+    // exception string, and in an Arabic layout it reads as debris.
+    messenger.showSnackBar(SnackBar(content: Text(l10n.importFailed)));
+    debugPrint('junglengine: import failed ($error)');
     return null;
   }
 }

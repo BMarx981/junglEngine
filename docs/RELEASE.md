@@ -20,32 +20,35 @@ Either write its provenance into the Origin cell, or drop it:
 Nothing else in the code changes either way. **No store build goes out while
 that row says UNCLEARED.**
 
-## 2. Firebase
+## 2. Firebase — done
 
-Crash reporting and the four analytics events are written and wired. They do
-nothing until there is a project behind them, and the app runs perfectly well
-without one: `TelemetryBoot.start` catches the failure and falls back to
-`NoTelemetry`.
+Project `junglengine`, with iOS and Android apps registered against
+`app.hawkstreak.junglengine`. `flutterfire configure` wrote
+`lib/firebase_options.dart`, `android/app/google-services.json`,
+`ios/Runner/GoogleService-Info.plist` and `firebase.json`, added the
+`com.google.gms.google-services` and `com.google.firebase.crashlytics` Gradle
+plugins, and added the plist and the dSYM upload build phase to the Xcode
+project. `TelemetryBoot.start` passes
+`DefaultFirebaseOptions.currentPlatform`.
 
-```sh
-dart pub global activate flutterfire_cli
-flutterfire configure --project=<your-firebase-project>
-```
+What it collects and how to prove it is live is `docs/TELEMETRY.md`. The short
+version: `TelemetryBoot.isLive` is true, a debug run logs no "no Firebase
+project configured" line, and Crashlytics needs one crash from a release or
+profile build before its dashboard leaves the setup screen.
 
-That writes `lib/firebase_options.dart`, `ios/Runner/GoogleService-Info.plist`
-and `android/app/google-services.json`. Then:
+Two things still want doing in the consoles, neither blocking a build:
 
-- Add the Google services Gradle plugin to `android/app/build.gradle.kts`:
-  `id("com.google.gms.google-services")`, and the Crashlytics plugin
-  `id("com.google.firebase.crashlytics")` if you want native symbol upload.
-- Change `Firebase.initializeApp()` in `lib/features/telemetry/telemetry.dart`
-  to `Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)`.
-
-Check it landed: `TelemetryBoot.isLive` is true, and a debug run logs no "no
-Firebase project configured" line. Crash collection is off in debug on purpose.
-
-**Do not commit `google-services.json` or `GoogleService-Info.plist` to a public
-repo.**
+- **GA4 property settings**: Google signals off, ad personalization off, data
+  retention set. The client already denies all three ad consent flags, and this
+  makes the console agree with it. Without it the line in `docs/PRIVACY.md` is
+  less true than it reads.
+- **Restrict the API keys** in Google Cloud Console → APIs & Services →
+  Credentials: the iOS key to the iOS bundle id, the Android key to the package
+  name plus signing SHA-1, and both to only the APIs Firebase needs. The keys
+  in the config files ship inside the app binary and are extractable from any
+  APK, so they are identifiers rather than secrets, which is why they are in
+  the repo. Restriction is what stops one being used against some other API
+  enabled on the project.
 
 ## 3. The Pro product
 
@@ -93,8 +96,8 @@ every note, so what is left is whether Reason likes it.
 
 ## 6. Signing
 
-- iOS: a distribution certificate and provisioning profile, and
-  `ios/Runner.xcodeproj` is still on automatic signing with no team set.
+- iOS: a distribution certificate and provisioning profile. The project is on
+  automatic signing with team `6W3F7S8Q67`.
 - Android: `android/app/build.gradle.kts` still signs release with the debug
   keys. Make an upload keystore and point a `signingConfigs.release` at it
   before uploading anything.

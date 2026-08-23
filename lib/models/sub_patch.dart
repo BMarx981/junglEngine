@@ -26,13 +26,12 @@ class SubPatch {
   /// Portamento time for tied notes, 0..1 mapped to 0 .. 220 ms.
   final double glide;
 
-  static const List<String> parameterNames = [
-    'TONE',
-    'CUTOFF',
-    'DRIVE',
-    'DECAY',
-    'GLIDE',
-  ];
+  /// Five, and five is the ceiling the sub synth spec sets.
+  ///
+  /// The count is a model concern because it is a promise about the instrument.
+  /// What the five are *called* is a UI concern, so the words live beside the
+  /// panel that draws them, in `subParameterLabels`.
+  static const int parameterCount = 5;
 
   double parameter(int index) => switch (index) {
     0 => tone,

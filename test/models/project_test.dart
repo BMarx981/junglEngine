@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:junglengine/features/bass/sub_panel.dart';
 import 'package:junglengine/models/beat.dart';
 import 'package:junglengine/models/chop_pattern.dart';
 import 'package:junglengine/models/kit_pattern.dart';
@@ -247,7 +248,11 @@ void main() {
 
   group('SubPatch', () {
     test('exposes exactly five parameters', () {
-      expect(SubPatch.parameterNames, hasLength(5));
+      expect(SubPatch.parameterCount, 5);
+      // The panel must have a word for each one. The labels moved out of the
+      // model so they could stay English while everything around them is
+      // translated, and this is what keeps the two halves in step.
+      expect(subParameterLabels, hasLength(SubPatch.parameterCount));
     });
 
     test('parameters clamp to 0..1', () {

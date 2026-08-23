@@ -6,6 +6,8 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../firebase_options.dart';
+
 /// Crash reports, and four counters.
 ///
 /// Four, named here, and no more without a reason that survives being said out
@@ -107,14 +109,16 @@ class FirebaseTelemetry implements Telemetry {
 /// Whichever one this build has. Overridden in tests.
 final telemetryProvider = Provider<Telemetry>((ref) => TelemetryBoot.active);
 
-/// Starts Firebase, if this build has it.
+/// Starts Firebase, if this build can.
 ///
-/// junglEngine ships and runs perfectly well with no Firebase project behind
-/// it, and it must: a debug build on a fresh clone has no `google-services.json`
-/// and no `GoogleService-Info.plist`. Everything here is best effort, and the
-/// app falls back to [NoTelemetry] rather than refusing to open.
+/// junglEngine ships and runs perfectly well with no Firebase behind it, and it
+/// must: `DefaultFirebaseOptions.currentPlatform` throws on every platform the
+/// FlutterFire CLI was not pointed at, which is all three desktops and web, and
+/// a build made from a clone with no `google-services.json` has nothing for the
+/// Android SDK to read. Everything here is best effort, and the app falls back
+/// to [NoTelemetry] rather than refusing to open.
 ///
-/// See docs/TELEMETRY.md for what to switch on before a store build.
+/// See docs/TELEMETRY.md for what this collects and how to check it is live.
 class TelemetryBoot {
   const TelemetryBoot._();
 
@@ -128,7 +132,9 @@ class TelemetryBoot {
   /// first frame is exactly the kind worth catching.
   static Future<void> start() async {
     try {
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
     } on Object catch (error) {
       debugPrint(
         'junglengine: no Firebase project configured ($error). '

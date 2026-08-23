@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../l10n/l10n.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
 import '../import/import_actions.dart';
@@ -44,7 +45,9 @@ class ExportSheet extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              parts ? 'EXPORT PARTS' : 'EXPORT WAV',
+              parts
+                  ? context.l10n.exportTitleParts
+                  : context.l10n.exportTitleWav,
               style: Theme.of(context).textTheme.labelMedium,
             ),
             const SizedBox(height: 14),
@@ -52,8 +55,10 @@ class ExportSheet extends ConsumerWidget {
               children: [
                 Expanded(
                   child: _ModeChip(
-                    label: 'LOOP',
-                    detail: 'BEAT ${state.beat.name.toUpperCase()}',
+                    label: context.l10n.exportModeLoop,
+                    detail: context.l10n.beatLabel(
+                      iso(state.beat.name.toUpperCase()),
+                    ),
                     selected: mode == ExportMode.loop,
                     enabled: true,
                     onTap: () => controller.setExportMode(ExportMode.loop),
@@ -62,10 +67,10 @@ class ExportSheet extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _ModeChip(
-                    label: 'SONG',
+                    label: context.l10n.exportModeSong,
                     detail: songBars == 0
-                        ? 'NOTHING ARRANGED'
-                        : '$songBars BARS',
+                        ? context.l10n.exportNothingArranged
+                        : context.l10n.barCount(songBars),
                     selected: song,
                     // Nothing to render until the arrangement has a card on it.
                     enabled: songBars > 0,
@@ -78,8 +83,9 @@ class ExportSheet extends ConsumerWidget {
                   // somewhere else. One Beat, because what a sampler wants is
                   // one instrument.
                   child: _ModeChip(
-                    label: 'PARTS',
-                    detail: isPro ? 'MIDI + SLICES' : 'PRO',
+                    label: context.l10n.exportModeParts,
+                    // PRO is the product name and stays English.
+                    detail: isPro ? context.l10n.exportMidiSlices : 'PRO',
                     selected: parts,
                     enabled: true,
                     onTap: () => _chooseParts(context, ref, controller),
@@ -89,14 +95,17 @@ class ExportSheet extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
             if (mode == ExportMode.loop) ...[
-              Text('REPEATS', style: Theme.of(context).textTheme.labelSmall),
+              Text(
+                context.l10n.exportRepeats,
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
               const SizedBox(height: 6),
               Row(
                 children: [
                   for (final bars in exportBarChoices)
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsetsDirectional.only(end: 8),
                         child: _BarChip(
                           bars: bars,
                           selected: bars == state.exportRepeats,
@@ -131,29 +140,41 @@ class ExportSheet extends ConsumerWidget {
                         ),
                       )
                     : Text(
-                        parts ? 'BUILD AND SHARE' : 'RENDER AND SHARE',
-                        style: const TextStyle(
+                        parts
+                            ? context.l10n.exportBuild
+                            : context.l10n.exportRender,
+                        style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 1,
+                          letterSpacing: Theme.of(
+                            context,
+                          ).textTheme.titleMedium?.letterSpacing,
                         ),
                       ),
               ),
             ),
             const SizedBox(height: 8),
             Text(
+              // Body copy, so these read as sentences rather than as the
+              // uppercase labels above them. The bar counts come from
+              // barCountSentence for the same reason.
               switch (mode) {
-                ExportMode.song =>
-                  'The whole arrangement, $songBars bars at '
-                      '${state.project.bpm.round()} BPM, 44.1 kHz 16 bit',
-                ExportMode.parts =>
-                  'Beat ${state.beat.name.toUpperCase()} as a MIDI file and '
-                      'the ${state.beat.isKit ? 'kit' : 'slices'} it plays, '
-                      'mapped from note $baseNote for Kong and NN-XT',
-                ExportMode.loop =>
-                  '${state.exportRepeats * state.beat.bars} bar'
-                      '${state.exportRepeats * state.beat.bars == 1 ? '' : 's'}'
-                      ' at ${state.project.bpm.round()} BPM, '
-                      '44.1 kHz 16 bit',
+                ExportMode.song => context.l10n.exportSongDetail(
+                  context.l10n.barCountSentence(songBars),
+                  state.project.bpm.round(),
+                ),
+                ExportMode.parts => context.l10n.exportPartsDetail(
+                  iso(state.beat.name.toUpperCase()),
+                  state.beat.isKit
+                      ? context.l10n.exportPartsKit
+                      : context.l10n.exportPartsSlices,
+                  baseNote,
+                ),
+                ExportMode.loop => context.l10n.exportLoopDetail(
+                  context.l10n.barCountSentence(
+                    state.exportRepeats * state.beat.bars,
+                  ),
+                  state.project.bpm.round(),
+                ),
               },
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.labelSmall,
@@ -182,6 +203,7 @@ class ExportSheet extends ConsumerWidget {
   ) async {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
+    final l10n = context.l10n;
     try {
       final result = await controller.exportWav();
       if (result == null) return;
@@ -200,7 +222,10 @@ class ExportSheet extends ConsumerWidget {
         ),
       );
     } on Object catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text('Export failed: $error')));
+      // The exception itself goes to the log, not the snack bar: it is an
+      // untranslated English string and often a stack fragment.
+      messenger.showSnackBar(SnackBar(content: Text(l10n.exportFailed)));
+      debugPrint('junglengine: export failed ($error)');
     }
   }
 }

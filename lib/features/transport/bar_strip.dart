@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../audio/engine.dart';
 import '../../models/steps.dart';
 import '../../state/studio.dart';
@@ -56,27 +57,35 @@ class _BarStripState extends ConsumerState<BarStrip> {
     final bars = state.beat.bars;
     if (bars <= 1) return const SizedBox.shrink();
 
-    return SizedBox(
-      height: BarStrip.height,
-      child: Row(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Text('BAR', style: Theme.of(context).textTheme.labelSmall),
-          ),
-          for (var bar = 0; bar < bars; bar++)
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: _BarChip(
-                  bar: bar,
-                  selected: bar == state.activeBar,
-                  onTap: () =>
-                      ref.read(studioProvider.notifier).setActiveBar(bar),
-                ),
+    // Bars are the time axis in miniature, legend included: the BAR label
+    // leads the numbers, and 1 stays on the left of 8 in every locale.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: SizedBox(
+        height: BarStrip.height,
+        child: Row(
+          children: [
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 8),
+              child: Text(
+                context.l10n.barStripLabel,
+                style: Theme.of(context).textTheme.labelSmall,
               ),
             ),
-        ],
+            for (var bar = 0; bar < bars; bar++)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 4),
+                  child: _BarChip(
+                    bar: bar,
+                    selected: bar == state.activeBar,
+                    onTap: () =>
+                        ref.read(studioProvider.notifier).setActiveBar(bar),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

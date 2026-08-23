@@ -2,9 +2,33 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme.dart';
 import 'pro_controller.dart';
 import 'pro_state.dart';
+
+/// The name and the sentence under it, for one Pro feature.
+(String, String) _proFeatureCopy(AppLocalizations l10n, ProFeature feature) =>
+    switch (feature) {
+      ProFeature.import => (
+        l10n.proFeatureImportTitle,
+        l10n.proFeatureImportDetail,
+      ),
+      ProFeature.midi => (l10n.proFeatureMidiTitle, l10n.proFeatureMidiDetail),
+      ProFeature.packs => (
+        l10n.proFeaturePacksTitle,
+        l10n.proFeaturePacksDetail,
+      ),
+    };
+
+/// One line in the list of things that are free and staying free.
+String _freeFeatureCopy(AppLocalizations l10n, FreeFeature feature) =>
+    switch (feature) {
+      FreeFeature.bundled => l10n.proFreeBundled,
+      FreeFeature.machines => l10n.proFreeMachines,
+      FreeFeature.songs => l10n.proFreeSongs,
+      FreeFeature.noAds => l10n.proFreeNoAds,
+    };
 
 /// What Pro costs and what it is.
 ///
@@ -50,14 +74,16 @@ class Paywall extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'JUNGLENGINE PRO',
+              context.l10n.proTitle,
               style: Theme.of(context).textTheme.labelMedium,
             ),
             const SizedBox(height: 4),
-            Text('ONE PURCHASE. NO SUBSCRIPTION. NO ADS.', style: labelSmall),
+            Text(context.l10n.proTagline, style: labelSmall),
             const SizedBox(height: 16),
-            for (final feature in proFeatures) ...[
-              _Feature(title: feature.title, detail: feature.detail),
+            for (final (title, detail) in ProFeature.values.map(
+              (feature) => _proFeatureCopy(context.l10n, feature),
+            )) ...[
+              _Feature(title: title, detail: detail),
               const SizedBox(height: 10),
             ],
             const SizedBox(height: 4),
@@ -70,9 +96,11 @@ class Paywall extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('ALREADY FREE, AND STAYING FREE', style: labelSmall),
+                  Text(context.l10n.proFreeHeader, style: labelSmall),
                   const SizedBox(height: 6),
-                  for (final feature in freeFeatures)
+                  for (final feature in FreeFeature.values.map(
+                    (feature) => _freeFeatureCopy(context.l10n, feature),
+                  ))
                     Padding(
                       padding: const EdgeInsets.only(bottom: 2),
                       child: Text(
@@ -88,10 +116,10 @@ class Paywall extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             _buyButton(context, pro, controller),
-            if (pro.message != null) ...[
+            if (pro.failed) ...[
               const SizedBox(height: 8),
               Text(
-                pro.message!,
+                pro.storeMessage ?? context.l10n.proPurchaseFailed,
                 textAlign: TextAlign.center,
                 style: labelSmall?.copyWith(color: JungleTheme.hot),
               ),
@@ -99,7 +127,7 @@ class Paywall extends ConsumerWidget {
             const SizedBox(height: 4),
             TextButton(
               onPressed: pro.isBusy ? null : controller.restore,
-              child: Text('RESTORE PURCHASE', style: labelSmall),
+              child: Text(context.l10n.proRestore, style: labelSmall),
             ),
             // The products do not exist in the stores until someone sets them
             // up, and the Pro features have to be testable before that day.
@@ -107,7 +135,7 @@ class Paywall extends ConsumerWidget {
               TextButton(
                 onPressed: controller.unlockForTesting,
                 child: Text(
-                  'DEBUG: UNLOCK WITHOUT BUYING',
+                  context.l10n.proDebugUnlock,
                   style: labelSmall?.copyWith(color: JungleTheme.sub),
                 ),
               ),
@@ -122,15 +150,20 @@ class Paywall extends ConsumerWidget {
     ProState pro,
     ProController controller,
   ) {
+    final l10n = context.l10n;
     final label = switch (pro.phase) {
-      ProPhase.unlocked => 'YOU HAVE PRO',
-      ProPhase.buying => 'WAITING FOR THE STORE',
-      ProPhase.checking => 'CHECKING',
+      ProPhase.unlocked => l10n.proHavePro,
+      ProPhase.buying => l10n.proWaiting,
+      ProPhase.checking => l10n.proChecking,
       // No price means the store does not know the product. Saying so beats a
       // button that fails when it is pressed.
       ProPhase.locked =>
-        pro.price == null ? 'NOT AVAILABLE RIGHT NOW' : 'GET PRO  ${pro.price}',
-      ProPhase.unavailable => 'PURCHASES ARE OFF ON THIS DEVICE',
+        pro.price == null
+            ? l10n.proUnavailableNow
+            // The store hands the price over already formatted for the buyer's
+            // country, so it is passed through untouched.
+            : l10n.proGet(pro.price!),
+      ProPhase.unavailable => l10n.proPurchasesOff,
     };
 
     return SizedBox(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../models/step_mod.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
@@ -13,6 +14,19 @@ String stepModGlyph(StepMod mod) => switch (mod) {
   StepMod.retrigger => '4',
   StepMod.pitchDown => '▼',
   StepMod.halfSpeed => '½',
+};
+
+/// What the picker calls a modifier.
+///
+/// Lives here rather than on the enum for the same reason [stepModGlyph] does:
+/// the model stays pure serialisable Dart, and wording that changes per locale
+/// stays in the layer that has a [BuildContext] to resolve it.
+String stepModLabel(AppLocalizations l10n, StepMod mod) => switch (mod) {
+  StepMod.none => l10n.stepModPlain,
+  StepMod.reverse => l10n.stepModReverse,
+  StepMod.retrigger => l10n.stepModRetrig,
+  StepMod.pitchDown => l10n.stepModPitchDown,
+  StepMod.halfSpeed => l10n.stepModHalfSpeed,
 };
 
 /// The per step modifier picker, opened by holding a cell that has a slice on
@@ -51,12 +65,16 @@ class StepModSheet extends ConsumerWidget {
             Row(
               children: [
                 Text(
-                  'STEP ${step % 16 + 1}',
+                  context.l10n.stepModStep(step % 16 + 1),
                   style: Theme.of(context).textTheme.labelMedium,
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  slice == null ? 'EMPTY' : 'SLICE ${slice + 1}',
+                  // SLICE stays English: it is the word on the divisions
+                  // control in the transport bar, and the two must match.
+                  slice == null
+                      ? context.l10n.stepModEmpty
+                      : 'SLICE ${slice + 1}',
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
               ],
@@ -126,7 +144,7 @@ class _Option extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                mod.isNone ? 'PLAIN' : mod.label,
+                stepModLabel(context.l10n, mod),
                 style: TextStyle(
                   color: enabled
                       ? foreground

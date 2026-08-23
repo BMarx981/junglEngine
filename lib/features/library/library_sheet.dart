@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
 import '../import/import_actions.dart';
@@ -38,13 +39,16 @@ class LibrarySheet extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('BREAK', style: Theme.of(context).textTheme.labelSmall),
+            Text(
+              context.l10n.libraryBreak,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
             const SizedBox(height: 6),
             for (final ref_ in BreakLibrary.bundled)
               _Row(
                 title: ref_.name,
                 detail:
-                    '${ref_.bars} BAR${ref_.bars == 1 ? '' : 'S'}  '
+                    '${context.l10n.barCount(ref_.bars)}  '
                     '${ref_.bpm.round()} BPM',
                 selected: ref_.id == state.project.breakId,
                 onTap: () => controller.setBreak(ref_.id),
@@ -57,8 +61,8 @@ class LibrarySheet extends ConsumerWidget {
               _Row(
                 title: imported.name,
                 detail:
-                    'YOURS  ${imported.bars} BAR'
-                    '${imported.bars == 1 ? '' : 'S'}  '
+                    '${context.l10n.libraryYours}  '
+                    '${context.l10n.barCount(imported.bars)}  '
                     '${imported.bpm.round()} BPM',
                 selected: imported.id == state.project.breakId,
                 onTap: () => controller.setBreak(imported.id),
@@ -66,8 +70,8 @@ class LibrarySheet extends ConsumerWidget {
             const SizedBox(height: 6),
             _ImportRow(
               label: state.project.importedBreak == null
-                  ? 'IMPORT YOUR OWN'
-                  : 'IMPORT ANOTHER',
+                  ? context.l10n.libraryImportFirst
+                  : context.l10n.libraryImportAnother,
               // Said before it is tapped, not after. A Pro feature that only
               // announces itself once you have reached for it is a trick.
               locked: !ref.watch(proProvider).isPro,
@@ -85,8 +89,7 @@ class LibrarySheet extends ConsumerWidget {
               ),
             const SizedBox(height: 10),
             Text(
-              'ONE BREAK AND ONE KIT PER PROJECT. CHANGING THE BREAK KEEPS '
-              'YOUR PATTERNS.',
+              context.l10n.libraryNote,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.labelSmall,
             ),
@@ -218,7 +221,7 @@ class _Row extends StatelessWidget {
               Flexible(
                 child: Text(
                   detail.toUpperCase(),
-                  textAlign: TextAlign.right,
+                  textAlign: TextAlign.end,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: selected

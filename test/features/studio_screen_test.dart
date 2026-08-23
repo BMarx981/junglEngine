@@ -16,6 +16,7 @@ import 'package:junglengine/features/transport/bar_strip.dart';
 import 'package:junglengine/models/kit_pattern.dart';
 import 'package:junglengine/features/library/break_library.dart';
 import 'package:junglengine/features/studio_screen.dart';
+import 'package:junglengine/l10n/l10n.dart';
 import 'package:junglengine/features/transport/action_bar.dart';
 import 'package:junglengine/features/transport/transport_bar.dart';
 import 'package:junglengine/state/studio.dart';
@@ -52,10 +53,10 @@ Finder inExportSheet(String text) =>
 
 /// Creates a one bar Kit Beat through the bank, the way a user would.
 Future<void> makeKitBeat(WidgetTester tester) async {
-  await tester.tap(inBeatBar('NEW'));
+  await tester.tap(inBeatBar(l10n.beatBarNew));
   await tester.pumpAndSettle();
   await tester.tap(inNewBeatSheet('KIT'));
-  await tester.tap(inNewBeatSheet('CREATE'));
+  await tester.tap(inNewBeatSheet(l10n.newBeatCreate));
   await tester.pumpAndSettle();
 }
 
@@ -88,7 +89,12 @@ Future<FakeAudioEngine> pumpStudio(WidgetTester tester) async {
         proStoreProvider.overrideWithValue(FakeProStore()),
       ],
       child: MaterialApp(
-        theme: JungleTheme.build(),
+        // Pinned so the assertions below can read English out of the lookup
+        // rather than depending on whatever locale the host happens to be in.
+        locale: const Locale('en'),
+        localizationsDelegates: junglengineLocalizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        theme: JungleTheme.build(const Locale('en')),
         home: const StudioScreen(),
       ),
     ),
@@ -100,7 +106,19 @@ Future<FakeAudioEngine> pumpStudio(WidgetTester tester) async {
   return engine;
 }
 
+/// English, read out of the generated lookup rather than retyped here.
+///
+/// Assertions on translated copy go through this, so that rewording a string
+/// is a one line change in the ARB rather than a hunt through the tests. The
+/// literals that survive below are the ones that are deliberately English in
+/// every locale: BPM, KIT, SUB, VOL, PITCH, the kit slot names and the numbers.
+late AppLocalizations l10n;
+
 void main() {
+  setUpAll(() async {
+    l10n = await AppLocalizations.delegate.load(const Locale('en'));
+  });
+
   testWidgets('boots into the studio with grid, sub lane and transport', (
     tester,
   ) async {
@@ -110,8 +128,8 @@ void main() {
     expect(find.byType(SubLaneView), findsOneWidget);
     expect(inTransportBar('170'), findsOneWidget);
     expect(inTransportBar('16'), findsOneWidget);
-    expect(inActionBar('SCRAMBLE'), findsOneWidget);
-    expect(inActionBar('EXPORT'), findsOneWidget);
+    expect(inActionBar(l10n.actionScramble), findsOneWidget);
+    expect(inActionBar(l10n.actionExport), findsOneWidget);
     // M0 ships one screen. No nav, no settings.
     expect(find.byType(BottomNavigationBar), findsNothing);
   });
@@ -133,11 +151,11 @@ void main() {
     final engine = await pumpStudio(tester);
     final before = List.of(engine.lastSpec!.beat.chop.steps);
 
-    await tester.tap(inActionBar('SCRAMBLE'));
+    await tester.tap(inActionBar(l10n.actionScramble));
     await tester.pump();
     expect(engine.lastSpec!.beat.chop.steps, isNot(equals(before)));
 
-    await tester.tap(inActionBar('UNDO'));
+    await tester.tap(inActionBar(l10n.actionUndo));
     await tester.pump();
     expect(engine.lastSpec!.beat.chop.steps, equals(before));
   });
@@ -228,7 +246,7 @@ void main() {
     await tester.tap(inActionBar('SUB'));
     await tester.pumpAndSettle();
 
-    expect(find.text('SUB SYNTH'), findsOneWidget);
+    expect(find.text(l10n.subTitle), findsOneWidget);
     expect(find.byType(Slider), findsNWidgets(5));
     for (final name in ['TONE', 'CUTOFF', 'DRIVE', 'DECAY', 'GLIDE']) {
       expect(find.text(name), findsOneWidget);
@@ -238,11 +256,11 @@ void main() {
   testWidgets('the export sheet offers one to eight bars', (tester) async {
     await pumpStudio(tester);
 
-    await tester.tap(inActionBar('EXPORT'));
+    await tester.tap(inActionBar(l10n.actionExport));
     await tester.pumpAndSettle();
 
-    expect(find.text('EXPORT WAV'), findsOneWidget);
-    expect(find.text('RENDER AND SHARE'), findsOneWidget);
+    expect(find.text(l10n.exportTitleWav), findsOneWidget);
+    expect(find.text(l10n.exportRender), findsOneWidget);
     expect(find.textContaining('2 bars at 170 BPM'), findsOneWidget);
   });
 
@@ -253,11 +271,11 @@ void main() {
 
     expect(find.byType(BeatBar), findsOneWidget);
     expect(inBeatBar('A'), findsOneWidget);
-    expect(inBeatBar('DUP'), findsOneWidget);
-    expect(inBeatBar('NEW'), findsOneWidget);
+    expect(inBeatBar(l10n.beatBarDup), findsOneWidget);
+    expect(inBeatBar(l10n.beatBarNew), findsOneWidget);
     // One bar Beat: nothing to page through.
     expect(find.byType(BarStrip), findsOneWidget);
-    expect(inBarStrip('BAR'), findsNothing);
+    expect(inBarStrip(l10n.barStripLabel), findsNothing);
   });
 
   testWidgets('duplicate puts a second Beat in the bank and opens it', (
@@ -265,7 +283,7 @@ void main() {
   ) async {
     final engine = await pumpStudio(tester);
 
-    await tester.tap(inBeatBar('DUP'));
+    await tester.tap(inBeatBar(l10n.beatBarDup));
     await tester.pump();
 
     expect(inBeatBar('B'), findsOneWidget);
@@ -277,13 +295,13 @@ void main() {
   ) async {
     final engine = await pumpStudio(tester);
 
-    await tester.tap(inBeatBar('NEW'));
+    await tester.tap(inBeatBar(l10n.beatBarNew));
     await tester.pumpAndSettle();
-    expect(find.text('NEW BEAT'), findsOneWidget);
+    expect(find.text(l10n.newBeatTitle), findsOneWidget);
 
     await tester.tap(inNewBeatSheet('KIT'));
     await tester.tap(inNewBeatSheet('4'));
-    await tester.tap(inNewBeatSheet('CREATE'));
+    await tester.tap(inNewBeatSheet(l10n.newBeatCreate));
     await tester.pumpAndSettle();
 
     expect(find.byType(KitGrid), findsOneWidget);
@@ -293,7 +311,7 @@ void main() {
     expect(engine.lastSpec!.beat.isKit, isTrue);
     expect(engine.lastSpec!.beat.bars, 4);
     // Four bars is four pages.
-    expect(inBarStrip('BAR'), findsOneWidget);
+    expect(inBarStrip(l10n.barStripLabel), findsOneWidget);
     expect(inBarStrip('4'), findsOneWidget);
   });
 
@@ -331,7 +349,7 @@ void main() {
     await tester.longPress(find.text('KICK'));
     await tester.pumpAndSettle();
 
-    expect(find.text('SLOT 1'), findsOneWidget);
+    expect(find.text(l10n.kitSlot(1)), findsOneWidget);
     expect(find.text('VOL'), findsOneWidget);
     expect(find.text('PITCH'), findsOneWidget);
     expect(find.byType(Slider), findsNWidgets(2));
@@ -344,7 +362,7 @@ void main() {
     await makeKitBeat(tester);
     final before = engine.lastSpec!.beat.kit.toJson();
 
-    await tester.tap(inActionBar('SCRAMBLE'));
+    await tester.tap(inActionBar(l10n.actionScramble));
     await tester.pump();
 
     expect(engine.lastSpec!.beat.kit.toJson(), before);
@@ -358,10 +376,10 @@ void main() {
   ) async {
     final engine = await pumpStudio(tester);
 
-    await tester.tap(inBeatBar('NEW'));
+    await tester.tap(inBeatBar(l10n.beatBarNew));
     await tester.pumpAndSettle();
     await tester.tap(inNewBeatSheet('4'));
-    await tester.tap(inNewBeatSheet('CREATE'));
+    await tester.tap(inNewBeatSheet(l10n.newBeatCreate));
     await tester.pumpAndSettle();
 
     await tester.tap(inBarStrip('3'));
@@ -432,7 +450,7 @@ void main() {
     expect(inBeatBar('GRID'), findsOneWidget);
     expect(find.textContaining('NOTHING ARRANGED'), findsOneWidget);
 
-    await tester.tap(inActionBar('ADD A'));
+    await tester.tap(inActionBar(l10n.actionAddBeat(iso('A'))));
     await tester.pump();
 
     expect(find.text('1x'), findsOneWidget);
@@ -456,11 +474,11 @@ void main() {
   ) async {
     final engine = await pumpStudio(tester);
 
-    await tester.tap(inBeatBar('DUP'));
+    await tester.tap(inBeatBar(l10n.beatBarDup));
     await tester.pump();
     await tester.tap(inBeatBar('SONG'));
     await tester.pumpAndSettle();
-    await tester.tap(inActionBar('ADD B'));
+    await tester.tap(inActionBar(l10n.actionAddBeat(iso('B'))));
     await tester.pump();
 
     // The card, not the bank chip of the same name.
@@ -477,20 +495,20 @@ void main() {
   testWidgets('the bank picks what the song view adds', (tester) async {
     final engine = await pumpStudio(tester);
 
-    await tester.tap(inBeatBar('DUP'));
+    await tester.tap(inBeatBar(l10n.beatBarDup));
     await tester.pump();
     await tester.tap(inBeatBar('SONG'));
     await tester.pumpAndSettle();
 
     // Opened on B after the duplicate. Tapping A in the bank makes A what the
     // ADD button adds, without leaving the arrangement.
-    expect(inActionBar('ADD B'), findsOneWidget);
+    expect(inActionBar(l10n.actionAddBeat(iso('B'))), findsOneWidget);
     await tester.tap(inBeatBar('A'));
     await tester.pump();
-    expect(inActionBar('ADD A'), findsOneWidget);
+    expect(inActionBar(l10n.actionAddBeat(iso('A'))), findsOneWidget);
     expect(find.byType(SongView), findsOneWidget);
 
-    await tester.tap(inActionBar('ADD A'));
+    await tester.tap(inActionBar(l10n.actionAddBeat(iso('A'))));
     await tester.pump();
 
     expect(engine.lastSpec!.sections.single.beat.name, 'A');
@@ -519,7 +537,7 @@ void main() {
     ) async {
       await pumpStudio(tester);
 
-      await tester.tap(inActionBar('EXPORT'));
+      await tester.tap(inActionBar(l10n.actionExport));
       await tester.pumpAndSettle();
 
       expect(inExportSheet('LOOP'), findsOneWidget);
@@ -534,7 +552,7 @@ void main() {
     ) async {
       await pumpStudio(tester);
 
-      await tester.tap(inActionBar('EXPORT'));
+      await tester.tap(inActionBar(l10n.actionExport));
       await tester.pumpAndSettle();
       await tester.tap(find.text('PARTS'));
       await tester.pumpAndSettle();
@@ -545,7 +563,7 @@ void main() {
       // The free tier is on the paywall too, because most of the app is in it.
       expect(find.text('ALREADY FREE, AND STAYING FREE'), findsOneWidget);
       // And the mode did not change behind it.
-      expect(find.text('EXPORT WAV'), findsOneWidget);
+      expect(find.text(l10n.exportTitleWav), findsOneWidget);
     });
 
     testWidgets('unlocking Pro closes the paywall and opens the mode', (
@@ -553,7 +571,7 @@ void main() {
     ) async {
       await pumpStudio(tester);
 
-      await tester.tap(inActionBar('EXPORT'));
+      await tester.tap(inActionBar(l10n.actionExport));
       await tester.pumpAndSettle();
       await tester.tap(find.text('PARTS'));
       await tester.pumpAndSettle();

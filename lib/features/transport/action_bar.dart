@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
 import '../bass/sub_panel.dart';
@@ -52,7 +53,7 @@ class ActionBar extends ConsumerWidget {
               flex: 2,
               child: _Action(
                 icon: Icons.playlist_add,
-                label: 'ADD $beatName',
+                label: context.l10n.actionAddBeat(iso(beatName)),
                 color: JungleTheme.accent,
                 onTap: () {
                   HapticFeedback.mediumImpact();
@@ -64,7 +65,7 @@ class ActionBar extends ConsumerWidget {
             Expanded(
               child: _Action(
                 icon: Icons.shuffle,
-                label: 'SCRAMBLE',
+                label: context.l10n.actionScramble,
                 enabled: !isKit,
                 color: JungleTheme.hot,
                 onTap: () {
@@ -76,7 +77,7 @@ class ActionBar extends ConsumerWidget {
             Expanded(
               child: _Action(
                 icon: Icons.undo,
-                label: 'UNDO',
+                label: context.l10n.actionUndo,
                 enabled: canUndo,
                 onTap: controller.undo,
               ),
@@ -85,6 +86,8 @@ class ActionBar extends ConsumerWidget {
           Expanded(
             child: _Action(
               icon: Icons.graphic_eq,
+              // SUB stays English: it labels the lane and the synth panel too,
+              // and all three have to read as the same thing.
               label: 'SUB',
               color: JungleTheme.sub,
               // Still the open Beat's synth in the Song view, which is the
@@ -95,7 +98,7 @@ class ActionBar extends ConsumerWidget {
           Expanded(
             child: _Action(
               icon: Icons.ios_share,
-              label: 'EXPORT',
+              label: context.l10n.actionExport,
               onTap: () => ExportSheet.show(context),
             ),
           ),
@@ -160,13 +163,23 @@ class _Action extends StatelessWidget {
         children: [
           Icon(icon, size: 21, color: tint),
           const SizedBox(height: 3),
-          Text(
-            label,
-            style: TextStyle(
-              color: tint,
-              fontSize: 8.5,
-              letterSpacing: 0.8,
-              fontWeight: FontWeight.w700,
+          // Five buttons share the width, and SCRAMBLE is already most of what
+          // fits. Translations run longer, so the label shrinks to fit rather
+          // than breaking the row. Scaling down keeps the geometry identical
+          // in every locale, which clipping or wrapping would not.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: TextStyle(
+                color: tint,
+                fontSize: 8.5,
+                letterSpacing: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.letterSpacing,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

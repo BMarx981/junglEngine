@@ -29,7 +29,42 @@ class JungleTheme {
   static const Color snareTint = Color(0xFFC8FF3C);
   static const Color ghostTint = Color(0xFF5F6B5E);
 
-  static ThemeData build() {
+  /// The big numbers: tempo, swing, volume, pitch, bar and slice counts.
+  ///
+  /// These are the only places monospace earns itself, and they are ASCII in
+  /// every locale by policy, so the mono face is never asked for a script it
+  /// cannot draw. Tabular figures stop the digits jittering as they count.
+  static TextStyle readout({
+    required double fontSize,
+    required Color color,
+    double height = 1.05,
+  }) => TextStyle(
+    color: color,
+    fontSize: fontSize,
+    height: height,
+    fontFamily: 'monospace',
+    fontWeight: FontWeight.w700,
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
+
+  /// Tracking is part of the look, but it is not safe everywhere.
+  ///
+  /// Arabic is cursive: prising the letters apart stops them joining and the
+  /// word stops being a word. CJK glyphs are already on a square body and
+  /// tracking only steals width from a phone that has none. Both get dialled
+  /// back rather than switched off, so the type still feels like this app.
+  static double _tracking(Locale locale, double wide) =>
+      switch (locale.languageCode) {
+        'ar' => 0,
+        'ja' || 'ko' || 'zh' => wide / 2,
+        _ => wide,
+      };
+
+  static ThemeData build(Locale locale) {
+    final wide = _tracking(locale, 1.4);
+    final medium = _tracking(locale, 1.2);
+    final tight = _tracking(locale, 0.5);
+
     const scheme = ColorScheme.dark(
       primary: accent,
       onPrimary: Color(0xFF0A0C0A),
@@ -45,25 +80,28 @@ class JungleTheme {
       scaffoldBackgroundColor: background,
       canvasColor: background,
       splashFactory: NoSplash.splashFactory,
-      fontFamily: 'monospace',
-      textTheme: const TextTheme(
+      // No app wide monospace. It used to be set here, which meant every
+      // translated label was asking a mono face for Arabic and CJK coverage it
+      // does not have. Monospace is what the numeric readouts want, and only
+      // them: see [readout].
+      textTheme: TextTheme(
         labelSmall: TextStyle(
           color: textDim,
           fontSize: 10,
-          letterSpacing: 1.4,
+          letterSpacing: wide,
           fontWeight: FontWeight.w700,
         ),
         labelMedium: TextStyle(
           color: text,
           fontSize: 12,
-          letterSpacing: 1.2,
+          letterSpacing: medium,
           fontWeight: FontWeight.w700,
         ),
         titleMedium: TextStyle(
           color: text,
           fontSize: 16,
           fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
+          letterSpacing: tight,
         ),
       ),
       bottomSheetTheme: const BottomSheetThemeData(

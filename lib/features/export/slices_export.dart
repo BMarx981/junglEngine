@@ -13,6 +13,20 @@ import '../bass/note_names.dart';
 import 'midi.dart';
 import 'wav_export.dart';
 
+/// What a step modifier is called inside an exported sample name.
+///
+/// English in every locale, and deliberately so: this ends up as a sample name
+/// in Kong or NN-XT, next to a file name built from [StepMod.code]. Names that
+/// go into other people's projects have to be stable and ASCII, so this does
+/// not follow the interface language.
+String _exportName(StepMod mod) => switch (mod) {
+  StepMod.none => '',
+  StepMod.reverse => 'reverse',
+  StepMod.retrigger => 'retrig',
+  StepMod.pitchDown => 'pitch down',
+  StepMod.halfSpeed => 'half speed',
+};
+
 /// The Beat as a MIDI file and the samples it plays, in a zip.
 ///
 /// This is the export for finishing somewhere else. A WAV is the loop; this is
@@ -168,8 +182,7 @@ class SlicesExporter {
             'slice-${_pad(variant.slice + 1)}-${variant.mod.code}',
           ),
           note: baseNote + count + i,
-          label:
-              'slice ${variant.slice + 1} ${variant.mod.label.toLowerCase()}',
+          label: 'slice ${variant.slice + 1} ${_exportName(variant.mod)}',
           clip: playedAt(
             sliceOf(breakClip, variant.slice, count),
             variant.mod.rate,

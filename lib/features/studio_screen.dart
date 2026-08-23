@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/l10n.dart';
 import '../state/studio.dart';
 import '../theme.dart';
 import 'bass/sub_lane_view.dart';
@@ -27,11 +29,17 @@ class StudioScreen extends ConsumerWidget {
     return Scaffold(
       body: SafeArea(
         child: switch (status) {
-          StudioStatus.loading => const _Message(text: 'LOADING BREAK'),
+          StudioStatus.loading => _Message(
+            text: context.l10n.studioLoadingBreak,
+          ),
           StudioStatus.failed => _Message(
-            text:
-                'AUDIO ENGINE FAILED\n\n'
-                '${ref.watch(studioProvider).errorMessage ?? ''}',
+            // The underlying error is a raw exception string in English, and in
+            // a right to left layout it reads as debris. It goes to the log,
+            // and on screen only while debugging.
+            text: kDebugMode
+                ? '${context.l10n.studioEngineFailed}\n\n'
+                      '${ref.watch(studioProvider).errorMessage ?? ''}'
+                : context.l10n.studioEngineFailed,
             color: JungleTheme.hot,
           ),
           StudioStatus.ready => const _Studio(),

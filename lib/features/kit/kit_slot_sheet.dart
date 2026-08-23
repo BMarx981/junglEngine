@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../models/kit_slot.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
@@ -46,7 +47,7 @@ class KitSlotSheet extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'SLOT ${slot + 1}',
+                  context.l10n.kitSlot(slot + 1),
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
                 const Spacer(),
@@ -61,6 +62,8 @@ class KitSlotSheet extends ConsumerWidget {
               ],
             ),
             _Row(
+              // VOL and PITCH are knob legends and stay English, matching
+              // the hint on the kit grid that points at them.
               label: 'VOL',
               value: settings.volume,
               display: '${(settings.volume * 100).round()}',
@@ -92,9 +95,9 @@ class KitSlotSheet extends ConsumerWidget {
                   child: _SlotButton(
                     label: imported == null
                         ? (ref.watch(proProvider).isPro
-                              ? 'IMPORT ONE SHOT'
-                              : 'IMPORT ONE SHOT  (PRO)')
-                        : 'REPLACE',
+                              ? context.l10n.kitImportOneShot
+                              : context.l10n.kitImportOneShotPro)
+                        : context.l10n.kitReplace,
                     onTap: () => importSlot(context, ref, slot),
                   ),
                 ),
@@ -102,7 +105,7 @@ class KitSlotSheet extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _SlotButton(
-                      label: 'USE KIT SAMPLE',
+                      label: context.l10n.kitUseKitSample,
                       onTap: () => controller.clearImportedSlot(slot),
                     ),
                   ),
@@ -197,7 +200,7 @@ class _Row extends StatelessWidget {
           width: 34,
           child: Text(
             display,
-            textAlign: TextAlign.right,
+            textAlign: TextAlign.end,
             style: Theme.of(
               context,
             ).textTheme.labelSmall?.copyWith(color: JungleTheme.text),

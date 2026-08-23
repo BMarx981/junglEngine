@@ -9,30 +9,32 @@
 /// there is no per modifier branch in the mixer.
 enum StepMod {
   /// Plays the slice as it is.
-  none('', '', 1.0, 1),
+  none('', 1.0, 1),
 
   /// Plays the slice backwards. The tail becomes the transient, which is the
   /// reverse snare every jungle roll ends on.
-  reverse('rev', 'REVERSE', -1.0, 1),
+  reverse('rev', -1.0, 1),
 
   /// Four hits inside the step instead of one, all from the head of the slice.
-  retrigger('ret', 'RETRIG', 1.0, 4),
+  retrigger('ret', 1.0, 4),
 
   /// Down a fourth. Enough to hear as a different drum, not so far that it
   /// stops being one.
-  pitchDown('pd', 'PITCH DOWN', 0.7491535384, 1),
+  pitchDown('pd', 0.7491535384, 1),
 
   /// Down an octave, so the slice is also twice as long: the classic weight on
   /// a snare that has to land.
-  halfSpeed('half', 'HALF SPEED', 0.5, 1);
+  halfSpeed('half', 0.5, 1);
 
-  const StepMod(this.code, this.label, this.rate, this.retriggers);
+  const StepMod(this.code, this.rate, this.retriggers);
 
   /// Short key written to JSON. Stable: it is in saved projects.
+  ///
+  /// There is deliberately no display label next to it. One used to sit here,
+  /// one argument along, and a translation pass that took the wrong literal
+  /// would have silently rewritten every saved project. The picker's wording
+  /// lives in `stepModLabel` in the grid feature, where it can be localised.
   final String code;
-
-  /// What the picker calls it.
-  final String label;
 
   /// Playback rate, negative when the slice is read backwards.
   final double rate;

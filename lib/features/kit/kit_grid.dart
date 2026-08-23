@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../models/kit_pattern.dart';
 import '../../models/kit_ref.dart';
 import '../../models/steps.dart';
@@ -51,92 +52,111 @@ class _KitGridState extends ConsumerState<KitGrid> {
             children: [
               Text('KIT', style: Theme.of(context).textTheme.labelSmall),
               const Spacer(),
-              Text(
-                'HOLD A PAD FOR VOL AND PITCH',
-                style: Theme.of(context).textTheme.labelSmall,
+              // Shrinks rather than overflowing, for the same reason as the
+              // sub lane hint above the bass: it is the longest string in the
+              // row and the one that matters least.
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Text(
+                    context.l10n.kitHint,
+                    maxLines: 1,
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                ),
               ),
             ],
           ),
         ),
+        // The pads are a time axis, so they stay left to right even in Arabic.
+        // Only the body: the header above is a label and a hint, and mirrors
+        // with the rest of the chrome.
         Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final rowHeight = (constraints.maxHeight / kitSlotCount).clamp(
-                KitGrid.minRowHeight,
-                KitGrid.maxRowHeight,
-              );
-              final cellWidth =
-                  (constraints.maxWidth - KitGrid.gutterWidth) / stepsPerBar;
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final rowHeight = (constraints.maxHeight / kitSlotCount).clamp(
+                  KitGrid.minRowHeight,
+                  KitGrid.maxRowHeight,
+                );
+                final cellWidth =
+                    (constraints.maxWidth - KitGrid.gutterWidth) / stepsPerBar;
 
-              return SingleChildScrollView(
-                child: SizedBox(
-                  height: rowHeight * kitSlotCount,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _SlotGutter(
-                        kitRef: state.kitRef,
-                        rowHeight: rowHeight,
-                        onTap: (slot) => ref
-                            .read(studioProvider.notifier)
-                            .auditionKitSlot(slot),
-                        onHold: (slot) => KitSlotSheet.show(context, slot),
-                      ),
-                      Expanded(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTapUp: (details) =>
-                              _tap(details.localPosition, cellWidth, rowHeight),
-                          onHorizontalDragStart: (details) => _dragStart(
-                            details.localPosition,
-                            cellWidth,
-                            rowHeight,
-                          ),
-                          onHorizontalDragUpdate: (details) => _dragUpdate(
-                            details.localPosition,
-                            cellWidth,
-                            rowHeight,
-                          ),
-                          onHorizontalDragEnd: (_) => _painting = false,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              CustomPaint(
-                                painter: _KitPainter(
-                                  cells: [
-                                    for (
-                                      var slot = 0;
-                                      slot < kitSlotCount;
-                                      slot++
-                                    )
-                                      [
-                                        for (var i = 0; i < stepsPerBar; i++)
-                                          beat.kit.velocityAt(
-                                            slot,
-                                            windowStart + i,
-                                          ),
-                                      ],
-                                  ],
-                                  rowHeight: rowHeight,
+                return SingleChildScrollView(
+                  child: SizedBox(
+                    height: rowHeight * kitSlotCount,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _SlotGutter(
+                          kitRef: state.kitRef,
+                          rowHeight: rowHeight,
+                          onTap: (slot) => ref
+                              .read(studioProvider.notifier)
+                              .auditionKitSlot(slot),
+                          onHold: (slot) => KitSlotSheet.show(context, slot),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTapUp: (details) => _tap(
+                              details.localPosition,
+                              cellWidth,
+                              rowHeight,
+                            ),
+                            onHorizontalDragStart: (details) => _dragStart(
+                              details.localPosition,
+                              cellWidth,
+                              rowHeight,
+                            ),
+                            onHorizontalDragUpdate: (details) => _dragUpdate(
+                              details.localPosition,
+                              cellWidth,
+                              rowHeight,
+                            ),
+                            onHorizontalDragEnd: (_) => _painting = false,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                CustomPaint(
+                                  painter: _KitPainter(
+                                    cells: [
+                                      for (
+                                        var slot = 0;
+                                        slot < kitSlotCount;
+                                        slot++
+                                      )
+                                        [
+                                          for (var i = 0; i < stepsPerBar; i++)
+                                            beat.kit.velocityAt(
+                                              slot,
+                                              windowStart + i,
+                                            ),
+                                        ],
+                                    ],
+                                    rowHeight: rowHeight,
+                                  ),
                                 ),
-                              ),
-                              CustomPaint(
-                                painter: PlayheadPainter(
-                                  transport: transport,
-                                  visibleSteps: stepsPerBar,
-                                  totalSteps: beat.stepCount,
-                                  stepOffset: windowStart,
+                                CustomPaint(
+                                  painter: PlayheadPainter(
+                                    transport: transport,
+                                    visibleSteps: stepsPerBar,
+                                    totalSteps: beat.stepCount,
+                                    stepOffset: windowStart,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ],
@@ -231,7 +251,7 @@ class _SlotGutter extends StatelessWidget {
               child: SizedBox(
                 height: rowHeight,
                 child: Container(
-                  margin: const EdgeInsets.only(right: 3, bottom: 2),
+                  margin: const EdgeInsetsDirectional.only(end: 3, bottom: 2),
                   decoration: BoxDecoration(
                     color: JungleTheme.surfaceHigh,
                     borderRadius: BorderRadius.circular(3),

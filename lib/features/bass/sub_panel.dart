@@ -1,9 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../models/sub_patch.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
+
+/// What the five knobs are called, in order.
+///
+/// Synth parameter names, so they stay English in every locale: these are the
+/// words printed on the panel of every hardware synth a producer has touched,
+/// and translating them would make the instrument harder to read, not easier.
+const List<String> subParameterLabels = [
+  'TONE',
+  'CUTOFF',
+  'DRIVE',
+  'DECAY',
+  'GLIDE',
+];
 
 /// The sub synth's controls. All five of them.
 ///
@@ -34,10 +48,10 @@ class SubPanel extends ConsumerWidget {
             Row(
               children: [
                 Text(
-                  'SUB SYNTH',
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: JungleTheme.sub,
-                  ),
+                  context.l10n.subTitle,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelMedium?.copyWith(color: JungleTheme.sub),
                 ),
                 const Spacer(),
                 TextButton(
@@ -45,9 +59,9 @@ class SubPanel extends ConsumerWidget {
                     controller.clearSub();
                     Navigator.of(context).pop();
                   },
-                  child: const Text(
-                    'CLEAR LANE',
-                    style: TextStyle(
+                  child: Text(
+                    context.l10n.subClearLane,
+                    style: const TextStyle(
                       color: JungleTheme.hot,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -57,9 +71,9 @@ class SubPanel extends ConsumerWidget {
                 ),
               ],
             ),
-            for (var i = 0; i < SubPatch.parameterNames.length; i++)
+            for (var i = 0; i < SubPatch.parameterCount; i++)
               _ParameterRow(
-                label: SubPatch.parameterNames[i],
+                label: subParameterLabels[i],
                 value: patch.parameter(i),
                 onChanged: (v) => controller.setSubParameter(i, v),
               ),
@@ -106,7 +120,7 @@ class _ParameterRow extends StatelessWidget {
           width: 34,
           child: Text(
             (value * 100).round().toString(),
-            textAlign: TextAlign.right,
+            textAlign: TextAlign.end,
             style: const TextStyle(
               color: JungleTheme.textDim,
               fontSize: 11,

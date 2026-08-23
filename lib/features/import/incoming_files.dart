@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../state/studio.dart';
 import 'audio_import.dart';
 import 'break_import_screen.dart';
@@ -84,6 +85,7 @@ class _IncomingFileWatcherState extends ConsumerState<IncomingFileWatcher>
 
     _handling = true;
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     try {
       // A file arriving from another app is the best moment there is to explain
       // what Pro is: the thing the user wants is already in their hand.
@@ -99,9 +101,13 @@ class _IncomingFileWatcherState extends ConsumerState<IncomingFileWatcher>
       if (!mounted) return;
       await BreakImportScreen.show(context, candidate);
     } on ImportException catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+      messenger.showSnackBar(
+        SnackBar(content: Text(importFailureMessage(l10n, error.failure))),
+      );
+      debugPrint('junglengine: incoming import failed ($error)');
     } on Object catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text('Import failed: $error')));
+      messenger.showSnackBar(SnackBar(content: Text(l10n.importFailed)));
+      debugPrint('junglengine: incoming import failed ($error)');
     } finally {
       _handling = false;
     }

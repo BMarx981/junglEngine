@@ -122,7 +122,7 @@ void main() {
       store.send(PurchaseStatus.canceled, needsCompleting: false);
       await settle();
       expect(state().phase, ProPhase.locked);
-      expect(state().message, isNull);
+      expect(state().failed, isFalse);
     });
 
     test('a refused purchase says why and stays locked', () async {
@@ -134,7 +134,9 @@ void main() {
       );
       await settle();
       expect(state().phase, ProPhase.locked);
-      expect(state().message, 'Your card was declined.');
+      expect(state().failed, isTrue);
+      // The store's own wording arrives translated, so it is shown verbatim.
+      expect(state().storeMessage, 'Your card was declined.');
     });
 
     test('a buy the store refuses outright comes back to locked', () async {
@@ -143,7 +145,10 @@ void main() {
       await controller().buy();
       await settle();
       expect(state().phase, ProPhase.locked);
-      expect(state().message, isNotNull);
+      // A thrown exception carries no store wording, so the paywall shows its
+      // own translated line instead of an untranslated Dart string.
+      expect(state().failed, isTrue);
+      expect(state().storeMessage, isNull);
     });
 
     test('a purchase of something else unlocks nothing', () async {
@@ -176,7 +181,7 @@ void main() {
       await controller().restore();
       await settle();
       expect(state().phase, ProPhase.locked);
-      expect(state().message, isNull);
+      expect(state().failed, isFalse);
     });
   });
 

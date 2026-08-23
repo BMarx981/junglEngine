@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../models/beat.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
@@ -39,7 +40,9 @@ class BeatBar extends ConsumerWidget {
           // Song view, tapping a chip is choosing what the ADD button adds.
           _BankButton(
             icon: state.inSong ? Icons.grid_on : Icons.queue_music,
-            label: state.inSong ? 'GRID' : 'SONG',
+            label: state.inSong
+                ? context.l10n.beatBarGrid
+                : context.l10n.beatBarSong,
             onTap: () {
               HapticFeedback.selectionClick();
               controller.setView(
@@ -70,7 +73,7 @@ class BeatBar extends ConsumerWidget {
           const SizedBox(width: 4),
           _BankButton(
             icon: Icons.content_copy,
-            label: 'DUP',
+            label: context.l10n.beatBarDup,
             onTap: () {
               HapticFeedback.mediumImpact();
               controller.duplicateActiveBeat();
@@ -79,7 +82,7 @@ class BeatBar extends ConsumerWidget {
           const SizedBox(width: 4),
           _BankButton(
             icon: Icons.add,
-            label: 'NEW',
+            label: context.l10n.beatBarNew,
             onTap: () => NewBeatSheet.show(context),
           ),
         ],
@@ -105,9 +108,12 @@ class BeatBar extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'BEAT ${beat.name.toUpperCase()}  '
-                '${beat.machineType.name.toUpperCase()}  '
-                '${beat.bars} BAR${beat.bars == 1 ? '' : 'S'}',
+                // Composed here rather than as one key: the separator is two
+                // spaces, there is no grammar between the parts, and the
+                // machine name is English in every locale.
+                '${sheetContext.l10n.beatLabel(iso(beat.name.toUpperCase()))}  '
+                '${machineTypeLabel(beat.machineType)}  '
+                '${sheetContext.l10n.barCount(beat.bars)}',
                 style: Theme.of(sheetContext).textTheme.labelMedium,
               ),
               const SizedBox(height: 16),
@@ -122,11 +128,13 @@ class BeatBar extends ConsumerWidget {
                     ),
                   ),
                   onPressed: () => Navigator.of(sheetContext).pop(true),
-                  child: const Text(
-                    'DELETE BEAT',
+                  child: Text(
+                    sheetContext.l10n.beatBarDelete,
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 1,
+                      letterSpacing: Theme.of(
+                        sheetContext,
+                      ).textTheme.titleMedium?.letterSpacing,
                     ),
                   ),
                 ),
@@ -160,7 +168,7 @@ class _BeatChip extends StatelessWidget {
       onTap: onTap,
       onLongPress: onHold,
       child: Container(
-        margin: const EdgeInsets.only(right: 5),
+        margin: const EdgeInsetsDirectional.only(end: 5),
         padding: const EdgeInsets.symmetric(horizontal: 9),
         decoration: BoxDecoration(
           color: selected ? JungleTheme.accent : JungleTheme.surfaceHigh,

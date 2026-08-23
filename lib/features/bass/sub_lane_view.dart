@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../models/steps.dart';
 import '../../models/sub_lane.dart';
 import '../../state/studio.dart';
@@ -56,84 +57,104 @@ class _SubLaneViewState extends ConsumerState<SubLaneView> {
                 ).textTheme.labelSmall?.copyWith(color: JungleTheme.sub),
               ),
               const Spacer(),
-              Text(
-                _dragSemitone != null
-                    ? noteName(beat.subRootMidi + _dragSemitone!)
-                    : 'DRAG PITCH HOLD ACCENT',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: _dragSemitone != null
-                      ? JungleTheme.sub
-                      : JungleTheme.textDim,
+              // The hint is the longest thing in this row and the least
+              // important, so it shrinks to fit. Scaling down rather than
+              // ellipsising because half a hint helps nobody.
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Text(
+                    _dragSemitone != null
+                        ? noteName(beat.subRootMidi + _dragSemitone!)
+                        : context.l10n.subHint,
+                    maxLines: 1,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: _dragSemitone != null
+                          ? JungleTheme.sub
+                          : JungleTheme.textDim,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 4),
             ],
           ),
         ),
+        // The note columns are a time axis and stay left to right. The header
+        // above mirrors with the rest of the chrome.
         SizedBox(
           height: SubLaneView.pitchHeight,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final columnWidth = constraints.maxWidth / stepsPerBar;
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTapUp: (details) => _onTap(
-                  details.localPosition,
-                  columnWidth,
-                  constraints.maxHeight,
-                ),
-                onVerticalDragStart: (details) => _onDragStart(
-                  details.localPosition,
-                  columnWidth,
-                  constraints.maxHeight,
-                ),
-                onVerticalDragUpdate: (details) =>
-                    _onDragUpdate(details.localPosition, constraints.maxHeight),
-                onVerticalDragEnd: (_) => setState(() {
-                  _dragStep = null;
-                  _dragSemitone = null;
-                }),
-                // Hold a note to accent it: the filter opens on that note and
-                // nothing else about it changes.
-                onLongPressStart: (details) {
-                  final step = _stepAt(details.localPosition.dx, columnWidth);
-                  if (beat.sub.stepAt(step).isRest) return;
-                  HapticFeedback.selectionClick();
-                  ref.read(studioProvider.notifier).toggleAccent(step);
-                },
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CustomPaint(
-                      painter: _SubLanePainter(
-                        steps: [
-                          for (var i = 0; i < stepsPerBar; i++)
-                            beat.sub.stepAt(windowStart + i),
-                        ],
-                        // The cell before the window, so a note tied across a
-                        // bar line is drawn gliding from where it really came
-                        // from rather than from the root.
-                        previous: windowStart > 0
-                            ? beat.sub.stepAt(windowStart - 1)
-                            : const SubStep.rest(),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final columnWidth = constraints.maxWidth / stepsPerBar;
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapUp: (details) => _onTap(
+                    details.localPosition,
+                    columnWidth,
+                    constraints.maxHeight,
+                  ),
+                  onVerticalDragStart: (details) => _onDragStart(
+                    details.localPosition,
+                    columnWidth,
+                    constraints.maxHeight,
+                  ),
+                  onVerticalDragUpdate: (details) => _onDragUpdate(
+                    details.localPosition,
+                    constraints.maxHeight,
+                  ),
+                  onVerticalDragEnd: (_) => setState(() {
+                    _dragStep = null;
+                    _dragSemitone = null;
+                  }),
+                  // Hold a note to accent it: the filter opens on that note and
+                  // nothing else about it changes.
+                  onLongPressStart: (details) {
+                    final step = _stepAt(details.localPosition.dx, columnWidth);
+                    if (beat.sub.stepAt(step).isRest) return;
+                    HapticFeedback.selectionClick();
+                    ref.read(studioProvider.notifier).toggleAccent(step);
+                  },
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CustomPaint(
+                        painter: _SubLanePainter(
+                          steps: [
+                            for (var i = 0; i < stepsPerBar; i++)
+                              beat.sub.stepAt(windowStart + i),
+                          ],
+                          // The cell before the window, so a note tied across a
+                          // bar line is drawn gliding from where it really came
+                          // from rather than from the root.
+                          previous: windowStart > 0
+                              ? beat.sub.stepAt(windowStart - 1)
+                              : const SubStep.rest(),
+                        ),
                       ),
-                    ),
-                    CustomPaint(
-                      painter: PlayheadPainter(
-                        transport: transport,
-                        visibleSteps: stepsPerBar,
-                        totalSteps: beat.stepCount,
-                        stepOffset: windowStart,
-                        color: JungleTheme.sub,
+                      CustomPaint(
+                        painter: PlayheadPainter(
+                          transport: transport,
+                          visibleSteps: stepsPerBar,
+                          totalSteps: beat.stepCount,
+                          stepOffset: windowStart,
+                          color: JungleTheme.sub,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            },
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ),
-        _TieStrip(lane: beat.sub, windowStart: windowStart),
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: _TieStrip(lane: beat.sub, windowStart: windowStart),
+        ),
       ],
     );
   }

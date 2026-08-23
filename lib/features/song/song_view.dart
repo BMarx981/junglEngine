@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../audio/engine.dart';
+import '../../l10n/l10n.dart';
 import '../../models/beat.dart';
 import '../../models/song.dart';
 import '../../state/studio.dart';
@@ -70,15 +71,17 @@ class _Header extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            'SONG',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: JungleTheme.accent,
-            ),
+            context.l10n.songTitle,
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: JungleTheme.accent),
           ),
           const Spacer(),
           Text(
-            '$cards CARD${cards == 1 ? '' : 'S'}   $bars BAR'
-            '${bars == 1 ? '' : 'S'}',
+            // Two counts side by side, joined by spacing rather than grammar,
+            // so they stay two keys. One key with two nested plurals would be
+            // a trap for every translator who opened it.
+            '${context.l10n.cardCount(cards)}   ${context.l10n.barCount(bars)}',
             style: Theme.of(context).textTheme.labelSmall,
           ),
         ],
@@ -96,9 +99,7 @@ class _Empty extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 30),
         child: Text(
-          'NOTHING ARRANGED YET\n\n'
-          'ADD THE BEAT YOU HAVE OPEN FROM THE BAR BELOW, '
-          'THEN SET HOW MANY TIMES IT REPEATS',
+          context.l10n.songEmpty,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.labelSmall,
         ),
@@ -142,9 +143,7 @@ class _SongCard extends ConsumerWidget {
           final playing = state.playing && state.entryIndex == index;
           return DecoratedBox(
             decoration: BoxDecoration(
-              color: playing
-                  ? JungleTheme.surfaceHigh
-                  : JungleTheme.surface,
+              color: playing ? JungleTheme.surfaceHigh : JungleTheme.surface,
               borderRadius: BorderRadius.circular(5),
               border: Border.all(
                 color: playing ? JungleTheme.accent : JungleTheme.line,
@@ -153,76 +152,82 @@ class _SongCard extends ConsumerWidget {
             child: child,
           );
         },
-        child: SizedBox(
-          height: 52,
-          child: Row(
-            children: [
-              ReorderableDragStartListener(
-                index: index,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Icon(
-                    Icons.drag_indicator,
-                    size: 20,
-                    color: JungleTheme.textDim,
+        // The card's own row is locked: the drag handle, the beat, the repeat
+        // stepper and the remove button keep one order everywhere, so the
+        // stepper's minus never swaps sides with its plus. The header, the
+        // empty state and the bar below all mirror normally.
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: SizedBox(
+            height: 52,
+            child: Row(
+              children: [
+                ReorderableDragStartListener(
+                  index: index,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Icon(
+                      Icons.drag_indicator,
+                      size: 20,
+                      color: JungleTheme.textDim,
+                    ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: beat == null
-                      ? null
-                      : () {
-                          HapticFeedback.selectionClick();
-                          controller.openBeatFromSong(beat.id);
-                        },
-                  child: Row(
-                    children: [
-                      Icon(
-                        beat == null
-                            ? Icons.help_outline
-                            : (beat.isKit
-                                  ? Icons.grid_view
-                                  : Icons.content_cut),
-                        size: 14,
-                        color: JungleTheme.text,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        beat?.name ?? '?',
-                        style: const TextStyle(
+                Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: beat == null
+                        ? null
+                        : () {
+                            HapticFeedback.selectionClick();
+                            controller.openBeatFromSong(beat.id);
+                          },
+                    child: Row(
+                      children: [
+                        Icon(
+                          beat == null
+                              ? Icons.help_outline
+                              : (beat.isKit
+                                    ? Icons.grid_view
+                                    : Icons.content_cut),
+                          size: 14,
                           color: JungleTheme.text,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '$bars BAR${bars == 1 ? '' : 'S'}',
-                        style: Theme.of(context).textTheme.labelSmall,
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Text(
+                          beat?.name ?? '?',
+                          style: const TextStyle(
+                            color: JungleTheme.text,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          context.l10n.barCount(bars),
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              _Stepper(
-                repeats: entry.repeats,
-                onChanged: (value) =>
-                    controller.setSongRepeats(index, value),
-              ),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  controller.removeSongEntry(index);
-                },
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: Icon(Icons.close, size: 16, color: JungleTheme.hot),
+                _Stepper(
+                  repeats: entry.repeats,
+                  onChanged: (value) => controller.setSongRepeats(index, value),
                 ),
-              ),
-            ],
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    controller.removeSongEntry(index);
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Icon(Icons.close, size: 16, color: JungleTheme.hot),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -251,13 +256,14 @@ class _Stepper extends StatelessWidget {
         SizedBox(
           width: 30,
           child: Text(
+            // The multiplier x is notation, not a word, and it is read the
+            // same way in every locale this ships to.
             '${repeats}x',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: JungleTheme.text,
+            style: JungleTheme.readout(
               fontSize: 14,
-              fontWeight: FontWeight.w700,
-              fontFeatures: [FontFeature.tabularFigures()],
+              color: JungleTheme.text,
+              height: 1,
             ),
           ),
         ),

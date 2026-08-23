@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../models/beat.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
@@ -46,28 +47,40 @@ class TransportBar extends ConsumerWidget {
               const Spacer(),
               // The project's source material, and the way to change it. One
               // break and one kit per project: this picks which, not how many.
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => LibrarySheet.show(context),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 2,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        state.breakRef.name.toUpperCase(),
-                        style: Theme.of(context).textTheme.labelSmall,
-                      ),
-                      const SizedBox(width: 3),
-                      const Icon(
-                        Icons.expand_more,
-                        size: 13,
-                        color: JungleTheme.textDim,
-                      ),
-                    ],
+              //
+              // Flexible because the name is the one thing in this row with no
+              // length limit: an imported break is named after whatever file
+              // it came from. It gives way before the buttons either side of
+              // it do, which is right, because it is the only part a tap can
+              // reveal in full.
+              Flexible(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => LibrarySheet.show(context),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            state.breakRef.name.toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        const Icon(
+                          Icons.expand_more,
+                          size: 13,
+                          color: JungleTheme.textDim,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -76,14 +89,21 @@ class TransportBar extends ConsumerWidget {
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: ref.read(studioProvider.notifier).clearPattern,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
                     child: Text(
-                      'CLEAR',
+                      context.l10n.transportClear,
                       style: TextStyle(
                         color: JungleTheme.hot,
                         fontSize: 10,
-                        letterSpacing: 1.2,
+                        // From the theme rather than a literal, so Arabic gets
+                        // the tracking switched off with everything else.
+                        letterSpacing: Theme.of(
+                          context,
+                        ).textTheme.labelMedium?.letterSpacing,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -149,16 +169,12 @@ class _BpmControlState extends ConsumerState<_BpmControl> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          // BPM stays English: it is on the face of every drum machine ever
+          // made, and a producer reads it faster than any translation.
           Text('BPM', style: Theme.of(context).textTheme.labelSmall),
           Text(
             bpm.round().toString().padLeft(3),
-            style: const TextStyle(
-              color: JungleTheme.text,
-              fontSize: 26,
-              height: 1.05,
-              fontWeight: FontWeight.w700,
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
+            style: JungleTheme.readout(fontSize: 26, color: JungleTheme.text),
           ),
         ],
       ),
@@ -207,15 +223,13 @@ class _SwingControlState extends ConsumerState<_SwingControl> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          // SWING is hardware vocabulary too, and stays English with BPM.
           Text('SWING', style: Theme.of(context).textTheme.labelSmall),
           Text(
             '$percent%',
-            style: TextStyle(
-              color: swing > 0 ? JungleTheme.accent : JungleTheme.text,
+            style: JungleTheme.readout(
               fontSize: 26,
-              height: 1.05,
-              fontWeight: FontWeight.w700,
-              fontFeatures: const [FontFeature.tabularFigures()],
+              color: swing > 0 ? JungleTheme.accent : JungleTheme.text,
             ),
           ),
         ],
@@ -236,18 +250,23 @@ class _SongReadout extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('ARRANGEMENT', style: Theme.of(context).textTheme.labelSmall),
+        Text(
+          context.l10n.transportArrangement,
+          style: Theme.of(context).textTheme.labelSmall,
+        ),
         const SizedBox(height: 3),
         SizedBox(
           height: 30,
           child: Align(
-            alignment: Alignment.centerLeft,
+            alignment: AlignmentDirectional.centerStart,
             child: Text(
-              '$bars BAR${bars == 1 ? '' : 'S'}',
-              style: const TextStyle(
+              context.l10n.barCount(bars),
+              style: TextStyle(
                 color: JungleTheme.text,
                 fontSize: 13,
-                letterSpacing: 0.8,
+                letterSpacing: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.letterSpacing,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -270,13 +289,14 @@ class _SliceSelector extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        // SLICES stays English, and STEP and SLICE in the step sheet with it.
         Text('SLICES', style: Theme.of(context).textTheme.labelSmall),
         const SizedBox(height: 3),
         Row(
           children: [
             for (final count in allowedSliceDivisions)
               Padding(
-                padding: const EdgeInsets.only(right: 6),
+                padding: const EdgeInsetsDirectional.only(end: 6),
                 child: _SliceChip(
                   count: count,
                   selected: count == division,
@@ -348,13 +368,15 @@ class _MachineReadout extends StatelessWidget {
         SizedBox(
           height: 30,
           child: Align(
-            alignment: Alignment.centerLeft,
+            alignment: AlignmentDirectional.centerStart,
             child: Text(
               name.toUpperCase(),
-              style: const TextStyle(
+              style: TextStyle(
                 color: JungleTheme.text,
                 fontSize: 13,
-                letterSpacing: 0.8,
+                letterSpacing: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.letterSpacing,
                 fontWeight: FontWeight.w700,
               ),
             ),

@@ -6,6 +6,27 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<!-- The twelve languages junglEngine is translated into. iOS needs them
+	     declared here, not just in the Dart supportedLocales: without this the
+	     system can report only English to the app on some launch paths, and the
+	     App Store listing does not show the language list at all. Keep in step
+	     with lib/l10n/. The app name itself is a wordmark and is not
+	     translated, so there are no InfoPlist.strings files behind this. -->
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>ar</string>
+		<string>es</string>
+		<string>fil</string>
+		<string>fr</string>
+		<string>ht</string>
+		<string>ja</string>
+		<string>ko</string>
+		<string>pt</string>
+		<string>ru</string>
+		<string>vi</string>
+		<string>zh</string>
+	</array>
 	<!-- Puts junglEngine in the Open In list wherever audio turns up: Files,
 	     Safari, Mail, the messengers. Rank is Alternate, not Owner: this app
 	     chops WAVs, it does not want to be what taps on one open by default. -->

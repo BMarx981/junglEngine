@@ -134,8 +134,9 @@ class ProController extends Notifier<ProState> {
     // purchases finished outside the app and ones left over from last session.
     _purchases = _store.purchases.listen(
       _onPurchases,
-      onError: (Object error) =>
-          _update((s) => s.copyWith(message: _readable(error))),
+      onError: (Object error) => _update(
+        (s) => s.copyWith(failed: true, storeMessage: _storeMessage(error)),
+      ),
     );
 
     final bool available;
@@ -145,7 +146,8 @@ class ProController extends Notifier<ProState> {
       _update(
         (s) => s.copyWith(
           phase: remembered ? ProPhase.unlocked : ProPhase.unavailable,
-          message: _readable(error),
+          failed: true,
+          storeMessage: _storeMessage(error),
         ),
       );
       return;
@@ -184,7 +186,11 @@ class ProController extends Notifier<ProState> {
       await _store.buy();
     } on Object catch (error) {
       _update(
-        (s) => s.copyWith(phase: ProPhase.locked, message: _readable(error)),
+        (s) => s.copyWith(
+          phase: ProPhase.locked,
+          failed: true,
+          storeMessage: _storeMessage(error),
+        ),
       );
     }
   }
@@ -198,7 +204,9 @@ class ProController extends Notifier<ProState> {
     try {
       await _store.restore().timeout(_timeout);
     } on Object catch (error) {
-      _update((s) => s.copyWith(message: _readable(error)));
+      _update(
+        (s) => s.copyWith(failed: true, storeMessage: _storeMessage(error)),
+      );
     }
   }
 
@@ -219,8 +227,10 @@ class ProController extends Notifier<ProState> {
           _update(
             (s) => s.copyWith(
               phase: s.isPro ? ProPhase.unlocked : ProPhase.locked,
-              message:
-                  purchase.error?.message ?? 'The purchase did not go through.',
+              failed: true,
+              // Whatever the store said, in the buyer's language. When it said
+              // nothing, the paywall supplies its own translated line.
+              storeMessage: purchase.error?.message,
             ),
           );
         case PurchaseStatus.canceled:
@@ -261,8 +271,15 @@ class ProController extends Notifier<ProState> {
     await _unlock();
   }
 
-  static String _readable(Object error) =>
-      error is IAPError ? (error.message) : '$error';
+  /// The store's own wording for a failure, when there is one.
+  ///
+  /// Null for anything else. A thrown Dart exception carries an untranslated
+  /// English string, which belongs in the log rather than on the paywall, so
+  /// the paywall falls back to its own translated line instead.
+  static String? _storeMessage(Object error) {
+    debugPrint('junglengine: purchase error ($error)');
+    return error is IAPError ? error.message : null;
+  }
 }
 
 final proProvider = NotifierProvider<ProController, ProState>(

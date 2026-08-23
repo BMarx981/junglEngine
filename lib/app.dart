@@ -1,10 +1,17 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/import/incoming_files.dart';
 import 'features/studio_screen.dart';
+import 'l10n/l10n.dart';
 import 'state/studio.dart';
 import 'theme.dart';
+
+/// Forces a locale in debug builds, so one device can be walked through all
+/// twelve without the app growing a language picker it does not want.
+/// Empty in every release build, because nothing passes the define there.
+const String _localeOverride = String.fromEnvironment('JE_LOCALE');
 
 class JungleApp extends ConsumerStatefulWidget {
   const JungleApp({super.key});
@@ -43,9 +50,20 @@ class _JungleAppState extends ConsumerState<JungleApp>
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'junglEngine',
+      onGenerateTitle: (context) => context.l10n.appTitle,
       debugShowCheckedModeBanner: false,
-      theme: JungleTheme.build(),
+      localizationsDelegates: junglengineLocalizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: kDebugMode && _localeOverride.isNotEmpty
+          ? Locale(_localeOverride)
+          : null,
+      // MaterialApp resolves the locale below this widget, so `theme:` cannot
+      // see it. Arabic needs the letter spacing off or its letters stop
+      // joining, and CJK does not want the tracking either.
+      builder: (context, child) => Theme(
+        data: JungleTheme.build(Localizations.localeOf(context)),
+        child: child!,
+      ),
       // Wrapped rather than built in, because taking in a file that another app
       // handed over needs a Navigator and a lifecycle, not anything the studio
       // knows about.

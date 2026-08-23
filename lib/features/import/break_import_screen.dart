@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
 import 'audio_import.dart';
@@ -97,7 +98,7 @@ class _BreakImportScreenState extends ConsumerState<BreakImportScreen> {
           onPressed: () => Navigator.of(context).pop(false),
         ),
         title: Text(
-          'IMPORT BREAK',
+          context.l10n.importTitle,
           style: Theme.of(context).textTheme.labelMedium,
         ),
       ),
@@ -122,11 +123,11 @@ class _BreakImportScreenState extends ConsumerState<BreakImportScreen> {
               const SizedBox(height: 10),
               _previewRow(),
               const SizedBox(height: 16),
-              Text('BARS', style: labelSmall),
+              Text(context.l10n.importBars, style: labelSmall),
               const SizedBox(height: 6),
               _barsRow(),
               const SizedBox(height: 16),
-              Text('TEMPO', style: labelSmall),
+              Text(context.l10n.importTempo, style: labelSmall),
               const SizedBox(height: 6),
               _tempoRow(),
               const SizedBox(height: 16),
@@ -226,7 +227,9 @@ class _BreakImportScreenState extends ConsumerState<BreakImportScreen> {
       children: [
         Expanded(
           child: _Button(
-            label: _previewing ? 'STOP' : 'PREVIEW LOOP',
+            label: _previewing
+                ? context.l10n.importStop
+                : context.l10n.importPreviewLoop,
             filled: _previewing,
             onTap: _togglePreview,
           ),
@@ -255,7 +258,7 @@ class _BreakImportScreenState extends ConsumerState<BreakImportScreen> {
         for (final bars in const [1, 2, 4, 8])
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsetsDirectional.only(end: 8),
               child: _Button(
                 label: '$bars',
                 filled: bars == _trim.bars,
@@ -319,7 +322,9 @@ class _BreakImportScreenState extends ConsumerState<BreakImportScreen> {
         SizedBox(
           width: 92,
           child: _Button(
-            label: _taps.hasTempo ? 'TAP ${_taps.taps}' : 'TAP',
+            label: _taps.hasTempo
+                ? context.l10n.importTapCount(_taps.taps)
+                : context.l10n.importTap,
             filled: false,
             onTap: _tap,
           ),
@@ -374,7 +379,7 @@ class _BreakImportScreenState extends ConsumerState<BreakImportScreen> {
     return Column(
       children: [
         Text(
-          '${_trim.bars} BAR${_trim.bars == 1 ? '' : 'S'}  '
+          '${context.l10n.barCount(_trim.bars)}  '
           '${seconds.toStringAsFixed(2)}s  '
           '${_bpm.round()} BPM',
           textAlign: TextAlign.center,
@@ -383,8 +388,10 @@ class _BreakImportScreenState extends ConsumerState<BreakImportScreen> {
         if (!_bpmIsUsable) ...[
           const SizedBox(height: 6),
           Text(
-            'THAT IS ${_bpm.round()} BPM AT ${_trim.bars} '
-            'BAR${_trim.bars == 1 ? '' : 'S'}. TRY A DIFFERENT BAR COUNT.',
+            context.l10n.importTooFast(
+              _bpm.round(),
+              context.l10n.barCount(_trim.bars),
+            ),
             textAlign: TextAlign.center,
             style: style?.copyWith(color: JungleTheme.hot),
           ),
@@ -392,7 +399,7 @@ class _BreakImportScreenState extends ConsumerState<BreakImportScreen> {
         if (widget.candidate.truncated) ...[
           const SizedBox(height: 6),
           Text(
-            'THAT FILE WAS LONGER THAN THE IMPORT LIMIT AND WAS CUT SHORT.',
+            context.l10n.importTruncated,
             textAlign: TextAlign.center,
             style: style,
           ),
@@ -421,9 +428,14 @@ class _BreakImportScreenState extends ConsumerState<BreakImportScreen> {
                   color: JungleTheme.background,
                 ),
               )
-            : const Text(
-                'USE THIS BREAK',
-                style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1),
+            : Text(
+                context.l10n.importUseBreak,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.letterSpacing,
+                ),
               ),
       ),
     );
@@ -433,6 +445,7 @@ class _BreakImportScreenState extends ConsumerState<BreakImportScreen> {
     setState(() => _saving = true);
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     try {
       await ref
           .read(studioProvider.notifier)
@@ -440,7 +453,8 @@ class _BreakImportScreenState extends ConsumerState<BreakImportScreen> {
       navigator.pop(true);
     } on Object catch (error) {
       setState(() => _saving = false);
-      messenger.showSnackBar(SnackBar(content: Text('Import failed: $error')));
+      messenger.showSnackBar(SnackBar(content: Text(l10n.importFailed)));
+      debugPrint('junglengine: saving imported break failed ($error)');
     }
   }
 }

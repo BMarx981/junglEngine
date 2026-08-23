@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "465110892170",
+    "project_id": "junglengine",
+    "storage_bucket": "junglengine.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:465110892170:android:d80b79d58531f7288e3773",
+        "android_client_info": {
+          "package_name": "app.hawkstreak.junglengine"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDctbIpeiFdJJhwP79o1lfDCbIVanxa9HA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -42,97 +42,106 @@ class _ChopGridState extends ConsumerState<ChopGrid> {
     final transport = ref.watch(transportProvider);
     final windowStart = state.windowStart;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Fill the viewport when the rows fit, and scroll once they would get
-        // too small to hit with a thumb.
-        final rowHeight = (constraints.maxHeight / beat.sliceCount).clamp(
-          ChopGrid.minRowHeight,
-          ChopGrid.maxRowHeight,
-        );
-        final gridHeight = rowHeight * beat.sliceCount;
-        final cellWidth =
-            (constraints.maxWidth - ChopGrid.gutterWidth) / stepsPerBar;
+    // Time runs left to right, in Arabic as much as anywhere else: every
+    // sequencer a producer has ever used reads that way, and the playhead
+    // sweeping backwards would be a bug, not a translation. The lock lives
+    // here rather than at the screen so a later layout change cannot drop it,
+    // and the slice gutter stays on the left where _cellAt's hit test maths
+    // expects it.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Fill the viewport when the rows fit, and scroll once they would get
+          // too small to hit with a thumb.
+          final rowHeight = (constraints.maxHeight / beat.sliceCount).clamp(
+            ChopGrid.minRowHeight,
+            ChopGrid.maxRowHeight,
+          );
+          final gridHeight = rowHeight * beat.sliceCount;
+          final cellWidth =
+              (constraints.maxWidth - ChopGrid.gutterWidth) / stepsPerBar;
 
-        return SingleChildScrollView(
-          child: SizedBox(
-            height: gridHeight,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _SliceGutter(
-                  sliceCount: beat.sliceCount,
-                  rowsPerBar: state.sliceDivision,
-                  rowHeight: rowHeight,
-                  analysis: state.analysis,
-                  onTapSlice: (slice) =>
-                      ref.read(studioProvider.notifier).auditionSlice(slice),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTapUp: (details) => _cellAt(
-                      details.localPosition,
-                      cellWidth,
-                      rowHeight,
-                      (slice, step) => ref
-                          .read(studioProvider.notifier)
-                          .toggleCell(slice, step),
-                    ),
-                    onHorizontalDragStart: (details) {
-                      _lastPaintedStep = null;
-                      _lastPaintedSlice = null;
-                      _paintAt(details.localPosition, cellWidth, rowHeight);
-                    },
-                    onHorizontalDragUpdate: (details) =>
-                        _paintAt(details.localPosition, cellWidth, rowHeight),
-                    onHorizontalDragEnd: (_) {
-                      _lastPaintedStep = null;
-                      _lastPaintedSlice = null;
-                    },
-                    // Hold a cell that has something on it to reverse it,
-                    // retrigger it, pitch it down or halve its speed.
-                    onLongPressStart: (details) => _cellAt(
-                      details.localPosition,
-                      cellWidth,
-                      rowHeight,
-                      (slice, step) {
-                        if (beat.chop.sliceAt(step) != slice) return;
-                        HapticFeedback.mediumImpact();
-                        StepModSheet.show(context, step);
+          return SingleChildScrollView(
+            child: SizedBox(
+              height: gridHeight,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _SliceGutter(
+                    sliceCount: beat.sliceCount,
+                    rowsPerBar: state.sliceDivision,
+                    rowHeight: rowHeight,
+                    analysis: state.analysis,
+                    onTapSlice: (slice) =>
+                        ref.read(studioProvider.notifier).auditionSlice(slice),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapUp: (details) => _cellAt(
+                        details.localPosition,
+                        cellWidth,
+                        rowHeight,
+                        (slice, step) => ref
+                            .read(studioProvider.notifier)
+                            .toggleCell(slice, step),
+                      ),
+                      onHorizontalDragStart: (details) {
+                        _lastPaintedStep = null;
+                        _lastPaintedSlice = null;
+                        _paintAt(details.localPosition, cellWidth, rowHeight);
                       },
-                    ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        CustomPaint(
-                          painter: _GridPainter(
-                            steps: [
-                              for (var i = 0; i < stepsPerBar; i++)
-                                beat.chop.stepAt(windowStart + i),
-                            ],
-                            sliceCount: beat.sliceCount,
-                            rowHeight: rowHeight,
-                            rowsPerBar: state.sliceDivision,
+                      onHorizontalDragUpdate: (details) =>
+                          _paintAt(details.localPosition, cellWidth, rowHeight),
+                      onHorizontalDragEnd: (_) {
+                        _lastPaintedStep = null;
+                        _lastPaintedSlice = null;
+                      },
+                      // Hold a cell that has something on it to reverse it,
+                      // retrigger it, pitch it down or halve its speed.
+                      onLongPressStart: (details) => _cellAt(
+                        details.localPosition,
+                        cellWidth,
+                        rowHeight,
+                        (slice, step) {
+                          if (beat.chop.sliceAt(step) != slice) return;
+                          HapticFeedback.mediumImpact();
+                          StepModSheet.show(context, step);
+                        },
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CustomPaint(
+                            painter: _GridPainter(
+                              steps: [
+                                for (var i = 0; i < stepsPerBar; i++)
+                                  beat.chop.stepAt(windowStart + i),
+                              ],
+                              sliceCount: beat.sliceCount,
+                              rowHeight: rowHeight,
+                              rowsPerBar: state.sliceDivision,
+                            ),
                           ),
-                        ),
-                        CustomPaint(
-                          painter: PlayheadPainter(
-                            transport: transport,
-                            visibleSteps: stepsPerBar,
-                            totalSteps: beat.stepCount,
-                            stepOffset: windowStart,
+                          CustomPaint(
+                            painter: PlayheadPainter(
+                              transport: transport,
+                              visibleSteps: stepsPerBar,
+                              totalSteps: beat.stepCount,
+                              stepOffset: windowStart,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
