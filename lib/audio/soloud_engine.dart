@@ -95,6 +95,13 @@ class SoLoudAudioEngine implements AudioEngine {
   Future<void>? _kitLoading;
   int _kitGeneration = 0;
 
+  /// Whatever the import screen is previewing. One at a time, disposed when the
+  /// next one starts, because these are whole files rather than slices and
+  /// keeping them around would be keeping the user's whole import in memory
+  /// twice.
+  AudioSource? _auditionSource;
+  int _auditionGeneration = 0;
+
   late final Float32List _block = Float32List(_blockFrames * 2);
   late final int _queueFrames = (sampleRate * _queueSeconds).round();
 
@@ -140,6 +147,7 @@ class SoLoudAudioEngine implements AudioEngine {
     await stop();
     await _disposeSliceSources();
     await _disposeKitSources();
+    await stopAuditionClip();
     if (_initialized) {
       await SoLoud.instance.disposeAllSources();
       SoLoud.instance.deinit();
@@ -398,6 +406,42 @@ class SoLoudAudioEngine implements AudioEngine {
     );
     SoLoud.instance.setRelativePlaySpeed(handle, settings.rate);
     SoLoud.instance.setPause(handle, false);
+  }
+
+  @override
+  Future<void> auditionClip(AudioClip clip, {bool looping = false}) async {
+    if (!_initialized || clip.frames == 0) return;
+    final generation = ++_auditionGeneration;
+    await stopAuditionClip();
+    final bytes = encodeWav(
+      clip.samples,
+      sampleRate: clip.sampleRate,
+      channels: clip.channels,
+    );
+    final source = await SoLoud.instance.loadMem(
+      'junglengine-audition-$generation.wav',
+      bytes,
+    );
+    // A drag across the trim handles can start several of these before the
+    // first one finishes loading. Only the newest may be heard.
+    if (generation != _auditionGeneration || _shuttingDown) {
+      await SoLoud.instance.disposeSource(source);
+      return;
+    }
+    _auditionSource = source;
+    SoLoud.instance.play(source, volume: 0.92, looping: looping);
+  }
+
+  @override
+  Future<void> stopAuditionClip() async {
+    final source = _auditionSource;
+    _auditionSource = null;
+    if (source == null) return;
+    try {
+      await SoLoud.instance.disposeSource(source);
+    } on SoLoudException {
+      // Already gone.
+    }
   }
 
   /// Loads one source per Kit slot. One kit per project, so this runs once.

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/kit_slot.dart';
 import '../../state/studio.dart';
 import '../../theme.dart';
+import '../import/import_actions.dart';
+import '../pro/pro_controller.dart';
 
 /// One Kit slot's controls: volume and pitch.
 ///
@@ -26,6 +28,7 @@ class KitSlotSheet extends ConsumerWidget {
     final state = ref.watch(studioProvider);
     final controller = ref.read(studioProvider.notifier);
     final settings = state.beat.slot(slot);
+    final imported = state.project.importedSlot(slot);
 
     return SafeArea(
       top: false,
@@ -79,7 +82,69 @@ class KitSlotSheet extends ConsumerWidget {
                     .round(),
               ),
             ),
+            const SizedBox(height: 8),
+            // Per slot, not per kit: replacing one hit is the thing people
+            // actually want, and it leaves the other seven where the kit put
+            // them. Volume and pitch belong to the Beat and stay put either way.
+            Row(
+              children: [
+                Expanded(
+                  child: _SlotButton(
+                    label: imported == null
+                        ? (ref.watch(proProvider).isPro
+                              ? 'IMPORT ONE SHOT'
+                              : 'IMPORT ONE SHOT  (PRO)')
+                        : 'REPLACE',
+                    onTap: () => importSlot(context, ref, slot),
+                  ),
+                ),
+                if (imported != null) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _SlotButton(
+                      label: 'USE KIT SAMPLE',
+                      onTap: () => controller.clearImportedSlot(slot),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Outlined, like the import row in the library sheet: a door out of the sheet
+/// rather than one of its controls.
+class _SlotButton extends StatelessWidget {
+  const _SlotButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: JungleTheme.accent),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: JungleTheme.accent,
+            fontSize: 11,
+            letterSpacing: 0.8,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );

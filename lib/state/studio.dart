@@ -8,11 +8,15 @@ import '../audio/audio_clip.dart';
 import '../audio/engine.dart';
 import '../audio/pattern_renderer.dart';
 import '../audio/soloud_engine.dart';
+import '../features/export/slices_export.dart';
 import '../features/export/wav_export.dart';
 import '../features/grid/scramble.dart';
 import '../features/grid/slice_analysis.dart';
+import '../features/import/audio_import.dart';
 import '../features/library/break_library.dart';
+import '../features/library/import_store.dart';
 import '../features/library/kit_library.dart';
+import '../features/telemetry/telemetry.dart';
 import '../models/beat.dart';
 import '../models/break_ref.dart';
 import '../models/chop_pattern.dart';
@@ -38,6 +42,9 @@ final projectStoreProvider = Provider<ProjectStore>(
   (ref) => const ProjectStore(),
 );
 
+/// Where imported audio is kept. Overridden in tests.
+final importStoreProvider = Provider<ImportStore>((ref) => const ImportStore());
+
 /// The playhead, straight from the audio layer.
 final transportProvider = Provider<ValueListenable<TransportState>>(
   (ref) => ref.watch(audioEngineProvider).transport,
@@ -59,6 +66,10 @@ enum ExportMode {
 
   /// The whole arrangement, once through.
   song,
+
+  /// The open Beat as a MIDI file and the samples it plays, in a zip. One pass,
+  /// one Beat: this is the export for finishing somewhere else.
+  parts,
 }
 
 @immutable
@@ -209,6 +220,10 @@ class StudioController extends Notifier<StudioState> {
 
   ProjectStore get _store => ref.read(projectStoreProvider);
 
+  ImportStore get _imports => ref.read(importStoreProvider);
+
+  Telemetry get _telemetry => ref.read(telemetryProvider);
+
   @override
   StudioState build() {
     final breakRef = BreakLibrary.defaultBreak;
@@ -282,13 +297,21 @@ class StudioController extends Notifier<StudioState> {
       // A saved project decides which break and kit to load, so this has to
       // happen before either of them is read off the bundle.
       final saved = await _loadSaved();
+      var project = saved ?? state.project;
       final breakRef = saved == null
           ? state.breakRef
-          : BreakLibrary.byId(saved.breakId);
-      final kitRef = saved == null
-          ? state.kitRef
-          : KitLibrary.byId(saved.kitId);
-      final project = saved ?? state.project;
+          : await _breakRefFor(project, project.breakId);
+      final kitRef = saved == null ? state.kitRef : await _kitRefFor(project);
+
+      // A project can outlive its imported audio: the file gets cleared out of
+      // the app's storage by the OS, or a restore brings back the JSON and not
+      // the WAV. Falling back to a bundled break is a project that still opens.
+      if (breakRef.id != project.breakId) {
+        project = project.copyWith(
+          breakId: breakRef.id,
+          clearImportedBreak: true,
+        );
+      }
 
       final clip = await BreakLibrary.load(breakRef, _engine.sampleRate);
       final kitClips = await KitLibrary.load(kitRef, _engine.sampleRate);
@@ -305,6 +328,10 @@ class StudioController extends Notifier<StudioState> {
         status: StudioStatus.ready,
       );
       await _engine.setSpec(_specFor(state)!);
+      // Imported audio is only reachable through the project, so anything the
+      // project stopped pointing at is unreachable rather than spare. A boot is
+      // the calm moment to clear it out.
+      unawaited(_sweepImports(state.project.importedFileNames));
     } on Object catch (error) {
       state = state.copyWith(
         status: StudioStatus.failed,
@@ -439,6 +466,13 @@ class StudioController extends Notifier<StudioState> {
       analysis: _analysisFor(beat),
     );
     _syncEngine();
+    // Which machine gets lived in, as opposed to which gets made once.
+    unawaited(
+      _telemetry.log(
+        TelemetryEvent.beatOpened,
+        parameters: {'machine': beat.machineType.name},
+      ),
+    );
   }
 
   /// Creates a Beat and opens it. Machine type and length are chosen here and
@@ -459,6 +493,12 @@ class StudioController extends Notifier<StudioState> {
       analysis: _analysisFor(beat),
     );
     _syncEngine();
+    unawaited(
+      _telemetry.log(
+        TelemetryEvent.beatCreated,
+        parameters: {'machine': machineType.name, 'bars': beat.bars},
+      ),
+    );
   }
 
   /// Copy and tweak, which is the whole point of the bank. The duplicate lands
@@ -542,7 +582,9 @@ class StudioController extends Notifier<StudioState> {
   void removeSongEntry(int index) {
     final song = state.project.song;
     if (index < 0 || index >= song.length) return;
-    state = state.copyWith(project: state.project.withSong(song.withoutAt(index)));
+    state = state.copyWith(
+      project: state.project.withSong(song.withoutAt(index)),
+    );
     _syncEngine();
   }
 
@@ -647,6 +689,7 @@ class StudioController extends Notifier<StudioState> {
     final analysis = state.analysis ?? SliceAnalysis.flat(beat.sliceCount);
     final next = scrambleWithSeed(beat, analysis, _seeds.nextInt(1 << 31));
     _commit(next, undoable: true);
+    unawaited(_telemetry.log(TelemetryEvent.scrambleTapped));
   }
 
   /// Split out so tests can pin the seed.
@@ -780,7 +823,7 @@ class StudioController extends Notifier<StudioState> {
 
   // --- Project library -----------------------------------------------------
 
-  /// Points the project at a different bundled break.
+  /// Points the project at a different break, bundled or imported.
   ///
   /// Still one break per project: this changes which one, not how many. Slice
   /// counts are per bar of the break, so every Chop Beat is re-divided at the
@@ -788,22 +831,32 @@ class StudioController extends Notifier<StudioState> {
   /// new break is dropped.
   Future<void> setBreak(String breakId) async {
     if (breakId == state.project.breakId) return;
-    final ref = BreakLibrary.byId(breakId);
+    final ref = await _breakRefFor(state.project, breakId);
+    await _applyBreak(ref, state.project.copyWith(breakId: ref.id));
+  }
+
+  /// Loads a break and re-divides every Chop Beat behind it.
+  ///
+  /// The one place a break change lands, whether it came from the library sheet
+  /// or from an import, because the reslicing is the part that must not be
+  /// written twice.
+  Future<void> _applyBreak(BreakRef ref, Project project) async {
     try {
       final clip = await BreakLibrary.load(ref, _engine.sampleRate);
       final wasBars = state.breakBars;
       final bars = ref.bars < 1 ? 1 : ref.bars;
-      final beats = [
-        for (final beat in state.project.beats)
-          if (beat.isKit)
-            beat
-          else
-            beat.resliced(_divisionOf(beat.sliceCount, wasBars) * bars),
-      ];
-      final project = state.project.copyWith(breakId: ref.id, beats: beats);
-      final open = project.beatById(state.activeBeatId) ?? project.firstBeat;
+      final next = project.copyWith(
+        beats: [
+          for (final beat in project.beats)
+            if (beat.isKit)
+              beat
+            else
+              beat.resliced(_divisionOf(beat.sliceCount, wasBars) * bars),
+        ],
+      );
+      final open = next.beatById(state.activeBeatId) ?? next.firstBeat;
       state = state.copyWith(
-        project: project,
+        project: next,
         breakRef: ref,
         clip: clip,
         analysis: SliceAnalysis.of(clip, open.sliceCount),
@@ -822,22 +875,149 @@ class StudioController extends Notifier<StudioState> {
   }
 
   /// Points the project at a different bundled kit. Slot volumes and pitches
-  /// stay where they are: they belong to the Beat, not to the samples.
+  /// stay where they are: they belong to the Beat, not to the samples. So do
+  /// imported one shots, which are per slot and survive a kit change for the
+  /// same reason.
   Future<void> setKit(String kitId) async {
     if (kitId == state.project.kitId) return;
-    final ref = KitLibrary.byId(kitId);
+    final project = state.project.copyWith(kitId: KitLibrary.byId(kitId).id);
+    await _applyKit(project);
+  }
+
+  /// Loads the project's kit, imported slot overrides and all.
+  Future<void> _applyKit(Project project) async {
     try {
+      final ref = await _kitRefFor(project);
       final clips = await KitLibrary.load(ref, _engine.sampleRate);
-      state = state.copyWith(
-        project: state.project.copyWith(kitId: ref.id),
-        kitRef: ref,
-        kitClips: clips,
-      );
+      state = state.copyWith(project: project, kitRef: ref, kitClips: clips);
       _syncEngine();
     } on Object catch (error) {
       debugPrint('junglengine: kit not loaded ($error)');
     }
   }
+
+  // --- Import --------------------------------------------------------------
+
+  /// The break the project imported, or null when it has none or the file it
+  /// pointed at is gone.
+  Future<BreakRef?> _importedBreakRef(Project project) async {
+    final imported = project.importedBreak;
+    if (imported == null) return null;
+    if (!await _imports.exists(imported.fileName)) return null;
+    return BreakRef.imported(
+      id: imported.id,
+      name: imported.name,
+      filePath: await _imports.pathOf(imported.fileName),
+      bpm: imported.bpm,
+      bars: imported.bars,
+    );
+  }
+
+  /// Resolves a break id against the imported break first and the bundle
+  /// second. An id that matches neither falls back to the default break, which
+  /// is what [BreakLibrary.byId] already does.
+  Future<BreakRef> _breakRefFor(Project project, String breakId) async {
+    final imported = await _importedBreakRef(project);
+    if (imported != null && imported.id == breakId) return imported;
+    return BreakLibrary.byId(breakId);
+  }
+
+  /// The bundled kit with the project's imported one shots patched over it.
+  ///
+  /// Resolving to one effective [KitRef] here is what keeps imports out of
+  /// everything downstream: loading, the grid gutter and audition all go on
+  /// treating a kit as eight samples in order.
+  Future<KitRef> _kitRefFor(Project project) async {
+    var ref = KitLibrary.byId(project.kitId);
+    for (final slot in project.importedSlots) {
+      if (slot.slot < 0 || slot.slot >= ref.samples.length) continue;
+      if (!await _imports.exists(slot.fileName)) continue;
+      ref = ref.withSample(
+        slot.slot,
+        KitSampleRef.imported(
+          label: slot.label,
+          filePath: await _imports.pathOf(slot.fileName),
+        ),
+      );
+    }
+    return ref;
+  }
+
+  /// Writes the trimmed import and makes it the project break.
+  ///
+  /// The project moves to the break's tempo, the same as a new project does,
+  /// because that is what makes the identity pattern reconstruct the loop the
+  /// user just trimmed. Importing a break and hearing it out of time would read
+  /// as a broken import rather than a tempo mismatch.
+  Future<void> useImportedBreak(
+    ImportCandidate candidate,
+    TrimSelection trim,
+    double bpm,
+  ) async {
+    final imported = await writeImportedBreak(
+      store: _imports,
+      candidate: candidate,
+      trim: trim,
+      bpm: bpm.clamp(minBpm, maxBpm),
+      stamp: DateTime.now().millisecondsSinceEpoch,
+    );
+    final project = state.project.withImportedBreak(imported);
+    final ref = BreakRef.imported(
+      id: imported.id,
+      name: imported.name,
+      filePath: await _imports.pathOf(imported.fileName),
+      bpm: imported.bpm,
+      bars: imported.bars,
+    );
+    await _applyBreak(ref, project);
+    await _sweepImports(state.project.importedFileNames);
+  }
+
+  /// Puts an imported one shot in a Kit slot.
+  ///
+  /// Slots stay positional: this changes what slot [slot] plays and nothing
+  /// else, so the Beat's volume and pitch for that position carry over exactly
+  /// as they do when the whole kit is switched.
+  Future<void> importSlotSample(int slot, ImportCandidate candidate) async {
+    if (slot < 0 || slot >= state.kitRef.samples.length) return;
+    final imported = await writeImportedSlot(
+      store: _imports,
+      candidate: candidate,
+      slot: slot,
+      stamp: DateTime.now().millisecondsSinceEpoch,
+    );
+    await _applyKit(state.project.withImportedSlot(imported));
+    await _sweepImports(state.project.importedFileNames);
+    unawaited(_engine.auditionKitSlot(slot));
+  }
+
+  /// Puts a slot back on the bundled kit's own sample.
+  Future<void> clearImportedSlot(int slot) async {
+    if (state.project.importedSlot(slot) == null) return;
+    await _applyKit(state.project.withoutImportedSlot(slot));
+    await _sweepImports(state.project.importedFileNames);
+  }
+
+  /// Deletes imported files the project no longer points at.
+  ///
+  /// Takes the names rather than reading them off [state], because this is
+  /// deliberately fired and forgotten: the controller can be disposed while the
+  /// directory listing is still in flight, and a sweep that reached back into
+  /// state afterwards would throw into nobody's hands.
+  Future<void> _sweepImports(Set<String> keep) async {
+    try {
+      await _imports.sweep(keep);
+    } on Object catch (error) {
+      debugPrint('junglengine: imports not swept ($error)');
+    }
+  }
+
+  /// Previews arbitrary audio, for the import screen. Never touches the
+  /// transport: what is being auditioned is not in the project yet.
+  Future<void> auditionClip(AudioClip clip, {bool looping = false}) =>
+      _engine.auditionClip(clip, looping: looping);
+
+  Future<void> stopAuditionClip() => _engine.stopAuditionClip();
 
   // --- Export --------------------------------------------------------------
 
@@ -847,22 +1027,62 @@ class StudioController extends Notifier<StudioState> {
   void setExportMode(ExportMode mode) =>
       state = state.copyWith(exportMode: mode);
 
-  /// Renders either the open Beat looped or the whole arrangement, depending on
-  /// [StudioState.exportMode]. A song renders once through: repeating an
-  /// arrangement is what the repeat counts are for.
+  /// Renders whichever of the three things [StudioState.exportMode] is set to.
+  ///
+  /// A song renders once through: repeating an arrangement is what the repeat
+  /// counts are for. The parts export renders no audio timeline at all, so it
+  /// goes its own way from here.
   Future<ExportResult?> exportWav() async {
     if (state.exporting) return null;
+    if (state.exportMode == ExportMode.parts) return exportParts();
+
     final song = state.exportMode == ExportMode.song;
     final spec = song ? _songSpec() : _specFor(state);
     if (spec == null) return null;
+    final bars = song
+        ? state.project.songBars
+        : state.exportRepeats * state.beat.bars;
     state = state.copyWith(exporting: true);
     try {
-      return await WavExporter.export(
+      final result = await WavExporter.export(
         engine: _engine,
         spec: spec,
         repeats: song ? 1 : state.exportRepeats,
         name: song ? state.project.name : state.beat.name,
       );
+      unawaited(
+        _telemetry.log(
+          TelemetryEvent.exportCompleted,
+          parameters: {'kind': song ? 'song' : 'loop', 'bars': bars},
+        ),
+      );
+      return result;
+    } finally {
+      state = state.copyWith(exporting: false);
+    }
+  }
+
+  /// The open Beat as MIDI plus the samples it plays.
+  Future<ExportResult?> exportParts() async {
+    final clip = state.clip;
+    if (clip == null) return null;
+    final machine = state.beat.machineType.name;
+    state = state.copyWith(exporting: true);
+    try {
+      final result = await SlicesExporter.export(
+        beat: state.beat,
+        breakClip: clip,
+        kitClips: state.kitClips,
+        bpm: state.project.bpm,
+        projectName: state.project.name,
+      );
+      unawaited(
+        _telemetry.log(
+          TelemetryEvent.exportCompleted,
+          parameters: {'kind': 'parts', 'machine': machine},
+        ),
+      );
+      return result;
     } finally {
       state = state.copyWith(exporting: false);
     }

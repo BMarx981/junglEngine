@@ -21,7 +21,12 @@ import 'package:junglengine/features/transport/transport_bar.dart';
 import 'package:junglengine/state/studio.dart';
 import 'package:junglengine/theme.dart';
 
+import 'package:junglengine/features/export/export_sheet.dart';
+import 'package:junglengine/features/pro/paywall.dart';
+import 'package:junglengine/features/pro/pro_controller.dart';
+
 import '../support/fake_engine.dart';
+import '../support/fake_pro_store.dart';
 
 /// Slice numbers also live down the side of the grid, so chip and button
 /// finders have to say which bar they mean.
@@ -39,6 +44,11 @@ Finder inNewBeatSheet(String text) =>
 
 Finder inBarStrip(String text) =>
     find.descendant(of: find.byType(BarStrip), matching: find.text(text));
+
+/// The action bar has a SONG button of its own, so the export sheet's chips
+/// have to say which SONG they mean.
+Finder inExportSheet(String text) =>
+    find.descendant(of: find.byType(ExportSheet), matching: find.text(text));
 
 /// Creates a one bar Kit Beat through the bank, the way a user would.
 Future<void> makeKitBeat(WidgetTester tester) async {
@@ -71,7 +81,12 @@ Future<FakeAudioEngine> pumpStudio(WidgetTester tester) async {
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [audioEngineProvider.overrideWithValue(engine)],
+      overrides: [
+        audioEngineProvider.overrideWithValue(engine),
+        // A test host has no App Store and no Play Billing, so the real one
+        // would hang on its first call and leave a timeout pending.
+        proStoreProvider.overrideWithValue(FakeProStore()),
+      ],
       child: MaterialApp(
         theme: JungleTheme.build(),
         home: const StudioScreen(),
@@ -496,5 +511,85 @@ void main() {
 
     expect(engine.lastSpec!.beat.sliceCount, 16);
     expect(inTransportBar('STEPPA'), findsOneWidget);
+  });
+
+  group('pro', () {
+    testWidgets('the export sheet offers the parts export, marked Pro', (
+      tester,
+    ) async {
+      await pumpStudio(tester);
+
+      await tester.tap(inActionBar('EXPORT'));
+      await tester.pumpAndSettle();
+
+      expect(inExportSheet('LOOP'), findsOneWidget);
+      expect(inExportSheet('SONG'), findsOneWidget);
+      expect(inExportSheet('PARTS'), findsOneWidget);
+      // A free user is told which one costs money before tapping it.
+      expect(find.text('PRO'), findsOneWidget);
+    });
+
+    testWidgets('choosing parts without Pro puts the paywall up', (
+      tester,
+    ) async {
+      await pumpStudio(tester);
+
+      await tester.tap(inActionBar('EXPORT'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('PARTS'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Paywall), findsOneWidget);
+      expect(find.text('JUNGLENGINE PRO'), findsOneWidget);
+      expect(find.text('GET PRO  £8.99'), findsOneWidget);
+      // The free tier is on the paywall too, because most of the app is in it.
+      expect(find.text('ALREADY FREE, AND STAYING FREE'), findsOneWidget);
+      // And the mode did not change behind it.
+      expect(find.text('EXPORT WAV'), findsOneWidget);
+    });
+
+    testWidgets('unlocking Pro closes the paywall and opens the mode', (
+      tester,
+    ) async {
+      await pumpStudio(tester);
+
+      await tester.tap(inActionBar('EXPORT'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('PARTS'));
+      await tester.pumpAndSettle();
+
+      // The debug unlock, which is what stands in for a purchase until the
+      // product exists in the stores.
+      await tester.tap(find.text('DEBUG: UNLOCK WITHOUT BUYING'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Paywall), findsNothing);
+      expect(find.text('EXPORT PARTS'), findsOneWidget);
+      expect(find.text('BUILD AND SHARE'), findsOneWidget);
+      expect(find.textContaining('Kong and NN-XT'), findsOneWidget);
+    });
+
+    testWidgets('the library sheet offers importing your own break', (
+      tester,
+    ) async {
+      await pumpStudio(tester);
+
+      await tester.tap(find.text(BreakLibrary.defaultBreak.name.toUpperCase()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('IMPORT YOUR OWN'), findsOneWidget);
+      expect(find.text('PRO'), findsOneWidget);
+    });
+
+    testWidgets('a kit slot offers importing a one shot', (tester) async {
+      await pumpStudio(tester);
+      await makeKitBeat(tester);
+
+      await tester.longPress(find.text('KICK'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('IMPORT ONE SHOT  (PRO)'), findsOneWidget);
+      expect(find.text('USE KIT SAMPLE'), findsNothing);
+    });
   });
 }

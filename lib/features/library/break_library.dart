@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 
 import '../../audio/audio_clip.dart';
@@ -59,7 +61,16 @@ class BreakLibrary {
 
   /// Decodes a break and conforms it to the mixer's expectations: stereo, at
   /// the engine sample rate, peak normalised.
+  ///
+  /// An imported break comes off disk instead of the bundle and is otherwise
+  /// treated identically, normalisation included: whatever the user brought in
+  /// should sit at the same level as what ships, or switching between them is
+  /// a volume change rather than a break change.
   static Future<AudioClip> load(BreakRef ref, int sampleRate) async {
+    final path = ref.filePath;
+    if (path != null) {
+      return loadBreakClip(await File(path).readAsBytes(), sampleRate);
+    }
     final data = await rootBundle.load(ref.assetPath);
     return loadBreakClip(data.buffer.asUint8List(), sampleRate);
   }

@@ -1,0 +1,30 @@
+name: junglengine_decode
+description: "Platform audio decoding for junglEngine: files in, interleaved float PCM out."
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.12.2
+  flutter: '>=3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: app.hawkstreak.junglengine_decode
+        pluginClass: JunglengineDecodePlugin
+      ios:
+        pluginClass: JunglengineDecodePlugin
+        sharedDarwinSource: true
+      macos:
+        pluginClass: JunglengineDecodePlugin
+        sharedDarwinSource: true

@@ -6,6 +6,34 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<!-- Puts junglEngine in the Open In list wherever audio turns up: Files,
+	     Safari, Mail, the messengers. Rank is Alternate, not Owner: this app
+	     chops WAVs, it does not want to be what taps on one open by default. -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Audio</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.audio</string>
+				<string>public.mp3</string>
+				<string>com.microsoft.waveform-audio</string>
+				<string>public.aifc-audio</string>
+				<string>public.aiff-audio</string>
+				<string>public.mpeg-4-audio</string>
+				<string>org.xiph.flac</string>
+			</array>
+		</dict>
+	</array>
+	<!-- The incoming file is copied into the app's own storage before anything
+	     is done with it, so there is nothing to edit in place. -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<false/>
 	<key>CFBundleDisplayName</key>
 	<string>junglEngine</string>
 	<key>CFBundleExecutable</key>

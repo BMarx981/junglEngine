@@ -1,4 +1,5 @@
 import 'beat.dart';
+import 'import_ref.dart';
 import 'machine_type.dart';
 import 'song.dart';
 
@@ -15,11 +16,14 @@ class Project {
     required this.bpm,
     required this.beats,
     this.song = const Song.empty(),
+    this.importedBreak,
+    this.importedSlots = const [],
   });
 
   /// Bumped when a change to the JSON shape needs old files handled. M1 added
-  /// Kit fields, but they are additive: a version 1 file still opens.
-  static const int schemaVersion = 2;
+  /// Kit fields and M3 added the imports, but every addition has been just
+  /// that: a version 1 file still opens.
+  static const int schemaVersion = 3;
 
   final String id;
   final String name;
@@ -33,7 +37,32 @@ class Project {
   final List<Beat> beats;
   final Song song;
 
+  /// The break the user imported, when [breakId] names it rather than a
+  /// bundled one. Kept here rather than in a library because there is one
+  /// project, and one break per project: the project is already the index.
+  final ImportedBreak? importedBreak;
+
+  /// One shots the user imported into Kit slots, at most one per slot.
+  final List<ImportedSlot> importedSlots;
+
   Beat get firstBeat => beats.first;
+
+  /// Whether [breakId] points at [importedBreak].
+  bool get breakIsImported => importedBreak?.id == breakId;
+
+  ImportedSlot? importedSlot(int slot) {
+    for (final s in importedSlots) {
+      if (s.slot == slot) return s;
+    }
+    return null;
+  }
+
+  /// Every imported file this project still points at. Anything in the imports
+  /// directory that is not named here is unreachable and can be swept.
+  Set<String> get importedFileNames => {
+    if (importedBreak != null) importedBreak!.fileName,
+    for (final slot in importedSlots) slot.fileName,
+  };
 
   Beat? beatById(String id) {
     for (final b in beats) {
@@ -73,6 +102,13 @@ class Project {
     double? bpm,
     List<Beat>? beats,
     Song? song,
+    ImportedBreak? importedBreak,
+    List<ImportedSlot>? importedSlots,
+
+    /// Going back to a bundled break drops the imported one, and null is the
+    /// value being set rather than the absence of an argument, so it needs a
+    /// flag of its own.
+    bool clearImportedBreak = false,
   }) => Project(
     id: id,
     name: name ?? this.name,
@@ -81,6 +117,31 @@ class Project {
     bpm: bpm ?? this.bpm,
     beats: beats ?? this.beats,
     song: song ?? this.song,
+    importedBreak: clearImportedBreak
+        ? null
+        : (importedBreak ?? this.importedBreak),
+    importedSlots: importedSlots ?? this.importedSlots,
+  );
+
+  /// Points the project at a break the user imported.
+  Project withImportedBreak(ImportedBreak value) =>
+      copyWith(breakId: value.id, importedBreak: value, bpm: value.bpm);
+
+  /// Puts an imported one shot in a slot, replacing whatever was there.
+  Project withImportedSlot(ImportedSlot value) => copyWith(
+    importedSlots: [
+      for (final slot in importedSlots)
+        if (slot.slot != value.slot) slot,
+      value,
+    ],
+  );
+
+  /// Puts a slot back on the bundled kit's sample.
+  Project withoutImportedSlot(int slot) => copyWith(
+    importedSlots: [
+      for (final s in importedSlots)
+        if (s.slot != slot) s,
+    ],
   );
 
   /// Replaces a Beat in place, matched by id.
@@ -157,6 +218,9 @@ class Project {
     'bpm': bpm,
     'beats': [for (final b in beats) b.toJson()],
     'song': song.toJson(),
+    if (importedBreak != null) 'importedBreak': importedBreak!.toJson(),
+    if (importedSlots.isNotEmpty)
+      'importedSlots': [for (final s in importedSlots) s.toJson()],
   };
 
   static Project fromJson(Map<String, Object?> json) {
@@ -165,6 +229,11 @@ class Project {
       if (rawBeats is List)
         for (final b in rawBeats)
           if (b is Map<String, Object?>) Beat.fromJson(b),
+    ];
+    final rawSlots = json['importedSlots'];
+    final slots = <ImportedSlot>[
+      if (rawSlots is List)
+        for (final s in rawSlots) ?ImportedSlot.fromJson(s),
     ];
     return Project(
       id: json['id'] as String? ?? 'project',
@@ -176,6 +245,8 @@ class Project {
           ? [Beat(id: 'beat-1', name: 'A', machineType: MachineType.chop)]
           : beats,
       song: Song.fromJson(json['song']),
+      importedBreak: ImportedBreak.fromJson(json['importedBreak']),
+      importedSlots: slots,
     );
   }
 }

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../state/studio.dart';
 import '../../theme.dart';
+import '../import/import_actions.dart';
+import '../pro/pro_controller.dart';
 import 'break_library.dart';
 import 'kit_library.dart';
 
@@ -47,6 +49,30 @@ class LibrarySheet extends ConsumerWidget {
                 selected: ref_.id == state.project.breakId,
                 onTap: () => controller.setBreak(ref_.id),
               ),
+            // The imported break sits in the same list as the bundled ones,
+            // because by the time it is in the project it is just the break
+            // this project uses. Importing a second one replaces it: still one
+            // break per project.
+            if (state.project.importedBreak case final imported?)
+              _Row(
+                title: imported.name,
+                detail:
+                    'YOURS  ${imported.bars} BAR'
+                    '${imported.bars == 1 ? '' : 'S'}  '
+                    '${imported.bpm.round()} BPM',
+                selected: imported.id == state.project.breakId,
+                onTap: () => controller.setBreak(imported.id),
+              ),
+            const SizedBox(height: 6),
+            _ImportRow(
+              label: state.project.importedBreak == null
+                  ? 'IMPORT YOUR OWN'
+                  : 'IMPORT ANOTHER',
+              // Said before it is tapped, not after. A Pro feature that only
+              // announces itself once you have reached for it is a trick.
+              locked: !ref.watch(proProvider).isPro,
+              onTap: () => importBreak(context, ref),
+            ),
             const SizedBox(height: 14),
             Text('KIT', style: Theme.of(context).textTheme.labelSmall),
             const SizedBox(height: 6),
@@ -65,6 +91,78 @@ class LibrarySheet extends ConsumerWidget {
               style: Theme.of(context).textTheme.labelSmall,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bring your own audio. Outlined rather than filled, because it is a door out
+/// of the list rather than another thing in it.
+class _ImportRow extends StatelessWidget {
+  const _ImportRow({
+    required this.label,
+    required this.locked,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool locked;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        height: 46,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: JungleTheme.accent),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.add, color: JungleTheme.accent, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: JungleTheme.accent,
+                fontSize: 12,
+                letterSpacing: 1,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (locked) ...[const SizedBox(width: 8), const _ProTag()],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Three letters, on anything that will ask for money when it is tapped.
+class _ProTag extends StatelessWidget {
+  const _ProTag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: JungleTheme.accent,
+        borderRadius: BorderRadius.circular(2),
+      ),
+      child: const Text(
+        'PRO',
+        style: TextStyle(
+          color: JungleTheme.background,
+          fontSize: 9,
+          letterSpacing: 0.8,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -109,9 +207,7 @@ class _Row extends StatelessWidget {
                   title.toUpperCase(),
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: selected
-                        ? JungleTheme.background
-                        : JungleTheme.text,
+                    color: selected ? JungleTheme.background : JungleTheme.text,
                     fontSize: 13,
                     letterSpacing: 0.8,
                     fontWeight: FontWeight.w700,

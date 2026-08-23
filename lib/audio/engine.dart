@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'audio_clip.dart';
 import 'pattern_renderer.dart';
 
 /// What the UI is allowed to know about playback.
@@ -99,6 +100,15 @@ abstract class AudioEngine {
   /// Plays one Kit slot immediately, at that slot's own volume and pitch, for
   /// tap feedback. Never affects the transport.
   Future<void> auditionKitSlot(int slot);
+
+  /// Plays an arbitrary clip immediately, optionally looping, and replaces
+  /// whatever the previous call started. This is how the import screen lets you
+  /// hear a trim before committing to it, so it takes a clip rather than an
+  /// index: what is being auditioned is not in the project yet.
+  Future<void> auditionClip(AudioClip clip, {bool looping = false});
+
+  /// Stops whatever [auditionClip] started. Never affects the transport.
+  Future<void> stopAuditionClip();
 
   /// Renders [spec] faster than real time. Used by WAV export, which must
   /// produce byte identical audio to what playback produces, so export goes

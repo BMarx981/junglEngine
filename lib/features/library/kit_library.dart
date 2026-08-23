@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 
 import '../../audio/audio_clip.dart';
@@ -107,12 +109,27 @@ class KitLibrary {
   ///
   /// Deliberately not normalised: the kit's balance is baked into the files, so
   /// slot volume starts at the same place for every slot and still sounds like
-  /// a kit.
+  /// a kit. An imported one shot is the exception the rule survives, because it
+  /// arrives peak normalised from the import screen and so lands in the same
+  /// place a bundled sample would.
+  ///
+  /// A slot whose imported file has gone missing falls back to silence rather
+  /// than failing the whole kit: seven slots and a hole is a recoverable
+  /// project, an exception on boot is not.
   static Future<List<AudioClip>> load(KitRef ref, int sampleRate) async {
     final clips = <AudioClip>[];
     for (final sample in ref.samples) {
-      final data = await rootBundle.load(sample.assetPath);
-      clips.add(loadOneShotClip(data.buffer.asUint8List(), sampleRate));
+      final path = sample.filePath;
+      if (path == null) {
+        final data = await rootBundle.load(sample.assetPath);
+        clips.add(loadOneShotClip(data.buffer.asUint8List(), sampleRate));
+        continue;
+      }
+      try {
+        clips.add(loadOneShotClip(await File(path).readAsBytes(), sampleRate));
+      } on Object {
+        clips.add(AudioClip.silent(frames: 1, sampleRate: sampleRate));
+      }
     }
     return List<AudioClip>.unmodifiable(clips);
   }

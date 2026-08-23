@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'features/import/incoming_files.dart';
 import 'features/studio_screen.dart';
 import 'state/studio.dart';
 import 'theme.dart';
@@ -45,7 +46,10 @@ class _JungleAppState extends ConsumerState<JungleApp>
       title: 'junglEngine',
       debugShowCheckedModeBanner: false,
       theme: JungleTheme.build(),
-      home: const StudioScreen(),
+      // Wrapped rather than built in, because taking in a file that another app
+      // handed over needs a Navigator and a lifecycle, not anything the studio
+      // knows about.
+      home: const IncomingFileWatcher(child: StudioScreen()),
     );
   }
 }

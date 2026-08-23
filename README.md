@@ -21,12 +21,13 @@ flutter run -d macos        # quickest way to hear a change
 
 ```sh
 flutter test                       # models, mixer, scramble, state, widgets
-flutter test integration_test -d macos   # the real audio device
+flutter test integration_test -d macos   # the real audio device and decoder
 ```
 
 The unit tests prove the mixer produces the right samples. The integration
 tests prove those samples reach an output device, by checking that the device
-consumed them. Both matter; neither substitutes for the other.
+consumed them, and that the platform audio decoder behind import agrees with
+the Dart one. Both matter; neither substitutes for the other.
 
 Integration tests cannot run on a wirelessly tethered iOS device. Plug the
 phone in, or use macOS.
@@ -157,7 +158,65 @@ not sampled, so they are guaranteed clear:
 dart run tool/make_break.dart
 ```
 
+## Bring your own audio
+
+Pro imports any file the phone can decode. WAV and AIFF are read in Dart; MP3,
+M4A, AAC, ALAC, FLAC and Ogg go through the platform's own decoders behind
+`packages/junglengine_decode`, which is a local plugin wrapping `AVAudioFile` on
+Apple platforms and `MediaCodec` on Android. Nothing is resampled or folded to
+mono on the way in that the mixer would not do anyway.
+
+The import screen asks the three things the app must not guess: where the loop
+starts, how many bars it is, and what tempo that makes it. Tempo is derived from
+the trim and the bar count, so typing a tempo or tapping one in moves the end of
+the trim to match. The trim is baked into the file that lands in the imports
+directory, so what the grid chops is exactly what you heard on that screen.
+
+The app is also registered for audio document types on both platforms, so it is
+in the Open In list in Files, Safari, Mail and the messengers. A file arriving
+that way goes straight to the same import screen.
+
+One break per project still holds: importing a second one replaces the first,
+and the file it stopped pointing at is swept. Kit slots are per slot, so an
+imported one shot replaces what slot *n* plays and leaves the other seven alone.
+
+## Parts export
+
+The export sheet's third mode writes a zip: a MIDI file, the samples it plays,
+and a README naming every note.
+
+Samples are numbered in mapping order, because both of Reason's samplers map a
+multiple selection up the keyboard in file order. A Chop Beat exports every
+slice, plus one extra file for each reverse, pitch down or half speed step the
+pattern actually uses; a retrigger is four notes rather than a fifth sample. A
+Kit Beat exports eight slots with volume and pitch baked in. Swing is in the
+tick positions, so the MIDI and the WAV of one Beat land on the same grid. The
+sub lane rides on its own channel as real pitches.
+
+One Beat, one pass. A song is what WAV export is for.
+
+## Pro
+
+One purchase, no subscription, no ads. Import, the parts export, and slice packs
+when they land; everything else is free and stays free.
+
+`lib/features/pro/` holds it. The store sits behind a `ProStore` interface,
+which is what makes a paywall testable without a real purchase, and the
+entitlement is cached in a file so a Pro user who opens the app on a plane is
+still Pro. The store is the authority and overwrites that cache either way.
+
+## Crash reporting and analytics
+
+Four events, named in `TelemetryEvent`, and no others. The app runs with no
+Firebase project behind it and falls back to doing nothing, which is what a
+fresh clone does. See [docs/PRIVACY.md](docs/PRIVACY.md) for what is collected
+and [docs/RELEASE.md](docs/RELEASE.md) for how to switch it on.
+
 ## Working rules
 
 Brian is the only one who commits. Every milestone has a gate in MILESTONES.md
 and the next one does not start until the gate is called.
+
+What M3 still needs from a human -- audio clearance, a Firebase project, the
+Pro product in both consoles, signing keys, and the Reason 13 check -- is listed
+in [docs/RELEASE.md](docs/RELEASE.md).

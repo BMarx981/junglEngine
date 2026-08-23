@@ -4,12 +4,17 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../state/studio.dart';
 import '../../theme.dart';
+import '../import/import_actions.dart';
+import '../pro/pro_controller.dart';
+import 'slices_export.dart';
 import 'wav_export.dart';
 
-/// Renders the loop to a WAV and hands it to the share sheet.
+/// Three ways out, and no fourth.
 ///
-/// One to eight bars, because the point is to drop the loop into whatever you
-/// actually finish tracks in.
+/// A loop for the sampler you finish tracks in, an arrangement for the clip you
+/// post, and the parts for when you want to take the beat apart somewhere with
+/// a mouse. All three go straight to the share sheet: this app has no file
+/// browser and does not want one.
 class ExportSheet extends ConsumerWidget {
   const ExportSheet({super.key});
 
@@ -25,7 +30,10 @@ class ExportSheet extends ConsumerWidget {
     final state = ref.watch(studioProvider);
     final controller = ref.read(studioProvider.notifier);
     final songBars = state.project.songBars;
-    final song = state.exportMode == ExportMode.song;
+    final mode = state.exportMode;
+    final song = mode == ExportMode.song;
+    final parts = mode == ExportMode.parts;
+    final isPro = ref.watch(proProvider).isPro;
 
     return SafeArea(
       top: false,
@@ -36,7 +44,7 @@ class ExportSheet extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'EXPORT WAV',
+              parts ? 'EXPORT PARTS' : 'EXPORT WAV',
               style: Theme.of(context).textTheme.labelMedium,
             ),
             const SizedBox(height: 14),
@@ -46,7 +54,7 @@ class ExportSheet extends ConsumerWidget {
                   child: _ModeChip(
                     label: 'LOOP',
                     detail: 'BEAT ${state.beat.name.toUpperCase()}',
-                    selected: !song,
+                    selected: mode == ExportMode.loop,
                     enabled: true,
                     onTap: () => controller.setExportMode(ExportMode.loop),
                   ),
@@ -64,10 +72,23 @@ class ExportSheet extends ConsumerWidget {
                     onTap: () => controller.setExportMode(ExportMode.song),
                   ),
                 ),
+                const SizedBox(width: 8),
+                Expanded(
+                  // MIDI and the samples that play it, for finishing the track
+                  // somewhere else. One Beat, because what a sampler wants is
+                  // one instrument.
+                  child: _ModeChip(
+                    label: 'PARTS',
+                    detail: isPro ? 'MIDI + SLICES' : 'PRO',
+                    selected: parts,
+                    enabled: true,
+                    onTap: () => _chooseParts(context, ref, controller),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 14),
-            if (!song) ...[
+            if (mode == ExportMode.loop) ...[
               Text('REPEATS', style: Theme.of(context).textTheme.labelSmall),
               const SizedBox(height: 6),
               Row(
@@ -109,9 +130,9 @@ class ExportSheet extends ConsumerWidget {
                           color: JungleTheme.background,
                         ),
                       )
-                    : const Text(
-                        'RENDER AND SHARE',
-                        style: TextStyle(
+                    : Text(
+                        parts ? 'BUILD AND SHARE' : 'RENDER AND SHARE',
+                        style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1,
                         ),
@@ -120,13 +141,20 @@ class ExportSheet extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              song
-                  ? 'The whole arrangement, $songBars bars at '
-                        '${state.project.bpm.round()} BPM, 44.1 kHz 16 bit'
-                  : '${state.exportRepeats * state.beat.bars} bar'
-                        '${state.exportRepeats * state.beat.bars == 1 ? '' : 's'}'
-                        ' at ${state.project.bpm.round()} BPM, '
-                        '44.1 kHz 16 bit',
+              switch (mode) {
+                ExportMode.song =>
+                  'The whole arrangement, $songBars bars at '
+                      '${state.project.bpm.round()} BPM, 44.1 kHz 16 bit',
+                ExportMode.parts =>
+                  'Beat ${state.beat.name.toUpperCase()} as a MIDI file and '
+                      'the ${state.beat.isKit ? 'kit' : 'slices'} it plays, '
+                      'mapped from note $baseNote for Kong and NN-XT',
+                ExportMode.loop =>
+                  '${state.exportRepeats * state.beat.bars} bar'
+                      '${state.exportRepeats * state.beat.bars == 1 ? '' : 's'}'
+                      ' at ${state.project.bpm.round()} BPM, '
+                      '44.1 kHz 16 bit',
+              },
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.labelSmall,
             ),
@@ -134,6 +162,18 @@ class ExportSheet extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Selecting the parts mode is where the Pro gate sits, rather than on the
+  /// export button: finding out it is Pro after choosing what to render, and
+  /// only when you press go, is the wrong order to learn it in.
+  Future<void> _chooseParts(
+    BuildContext context,
+    WidgetRef ref,
+    StudioController controller,
+  ) async {
+    if (!await requirePro(context, ref)) return;
+    controller.setExportMode(ExportMode.parts);
   }
 
   Future<void> _export(
@@ -148,7 +188,14 @@ class ExportSheet extends ConsumerWidget {
       navigator.pop();
       await SharePlus.instance.share(
         ShareParams(
-          files: [XFile(result.file.path, mimeType: 'audio/wav')],
+          files: [
+            XFile(
+              result.file.path,
+              mimeType: result.fileName.endsWith('.zip')
+                  ? 'application/zip'
+                  : 'audio/wav',
+            ),
+          ],
           text: result.fileName,
         ),
       );
@@ -158,8 +205,7 @@ class ExportSheet extends ConsumerWidget {
   }
 }
 
-/// Loop or song. Two things to render and no third: a loop for the sampler you
-/// finish tracks in, an arrangement for the clip you post.
+/// Loop, song or parts.
 class _ModeChip extends StatelessWidget {
   const _ModeChip({
     required this.label,
