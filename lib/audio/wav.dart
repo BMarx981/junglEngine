@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'audio_clip.dart';
+import 'package:junglengine/audio/audio_clip.dart';
 
 /// Thrown when a file does not look like a WAV this app can read.
 class WavFormatException implements Exception {

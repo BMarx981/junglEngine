@@ -1,7 +1,7 @@
-import 'beat.dart';
-import 'import_ref.dart';
-import 'machine_type.dart';
-import 'song.dart';
+import 'package:junglengine/models/beat.dart';
+import 'package:junglengine/models/import_ref.dart';
+import 'package:junglengine/models/machine_type.dart';
+import 'package:junglengine/models/song.dart';
 
 /// Project > Beats > Song.
 ///

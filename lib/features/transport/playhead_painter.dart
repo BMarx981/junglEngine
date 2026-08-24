@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../audio/engine.dart';
-import '../../theme.dart';
+import 'package:junglengine/audio/engine.dart';
+import 'package:junglengine/theme.dart';
 
 /// The playhead, on its own paint layer so it can move at frame rate without
 /// dragging the grid underneath it into a repaint.

@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../l10n/l10n.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
-import '../import/import_actions.dart';
-import '../pro/pro_controller.dart';
-import 'slices_export.dart';
-import 'wav_export.dart';
+import 'package:junglengine/features/export/slices_export.dart';
+import 'package:junglengine/features/export/wav_export.dart';
+import 'package:junglengine/features/import/import_actions.dart';
+import 'package:junglengine/features/pro/pro_controller.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// Three ways out, and no fourth.
 ///

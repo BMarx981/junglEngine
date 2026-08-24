@@ -2,11 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'features/import/incoming_files.dart';
-import 'features/studio_screen.dart';
-import 'l10n/l10n.dart';
-import 'state/studio.dart';
-import 'theme.dart';
+import 'package:junglengine/features/import/incoming_files.dart';
+import 'package:junglengine/features/studio_screen.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// Forces a locale in debug builds, so one device can be walked through all
 /// twelve without the app growing a language picker it does not want.

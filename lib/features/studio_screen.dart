@@ -2,17 +2,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../l10n/l10n.dart';
-import '../state/studio.dart';
-import '../theme.dart';
-import 'bass/sub_lane_view.dart';
-import 'grid/chop_grid.dart';
-import 'kit/kit_grid.dart';
-import 'song/beat_bar.dart';
-import 'song/song_view.dart';
-import 'transport/action_bar.dart';
-import 'transport/bar_strip.dart';
-import 'transport/transport_bar.dart';
+import 'package:junglengine/features/bass/sub_lane_view.dart';
+import 'package:junglengine/features/grid/chop_grid.dart';
+import 'package:junglengine/features/kit/kit_grid.dart';
+import 'package:junglengine/features/song/beat_bar.dart';
+import 'package:junglengine/features/song/song_view.dart';
+import 'package:junglengine/features/transport/action_bar.dart';
+import 'package:junglengine/features/transport/bar_strip.dart';
+import 'package:junglengine/features/transport/transport_bar.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// The only screen there is.
 ///

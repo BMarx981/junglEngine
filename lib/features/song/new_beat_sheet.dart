@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../l10n/l10n.dart';
-import '../../models/beat.dart';
-import '../../models/machine_type.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/models/beat.dart';
+import 'package:junglengine/models/machine_type.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// What a machine is called on screen.
 ///

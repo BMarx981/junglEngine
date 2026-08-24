@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../l10n/l10n.dart';
-import '../../models/steps.dart';
-import '../../models/sub_lane.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
-import '../transport/playhead_painter.dart';
-import 'note_names.dart';
-import 'sub_editor.dart';
+import 'package:junglengine/features/bass/note_names.dart';
+import 'package:junglengine/features/bass/sub_editor.dart';
+import 'package:junglengine/features/transport/playhead_painter.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/models/steps.dart';
+import 'package:junglengine/models/sub_lane.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// The sub lane.
 ///

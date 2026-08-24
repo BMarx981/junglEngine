@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import '../../audio/audio_clip.dart';
+import 'package:junglengine/audio/audio_clip.dart';
 
 /// A cheap read of what each equal division of the break actually contains.
 ///

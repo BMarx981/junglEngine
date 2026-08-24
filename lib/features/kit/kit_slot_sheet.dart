@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../l10n/l10n.dart';
-import '../../models/kit_slot.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
-import '../import/import_actions.dart';
-import '../pro/pro_controller.dart';
+import 'package:junglengine/features/import/import_actions.dart';
+import 'package:junglengine/features/pro/pro_controller.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/models/kit_slot.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// One Kit slot's controls: volume and pitch.
 ///

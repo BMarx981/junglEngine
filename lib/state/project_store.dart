@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
-import '../models/project.dart';
+import 'package:junglengine/models/project.dart';
 
 /// Local project persistence. One file, JSON, no cloud and no accounts.
 ///

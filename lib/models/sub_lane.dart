@@ -1,4 +1,4 @@
-import 'steps.dart';
+import 'package:junglengine/models/steps.dart';
 
 /// The lowest and highest note the sub lane can hold, in semitones relative to
 /// the lane's root. Deliberately narrow: this is a sub, not a lead.

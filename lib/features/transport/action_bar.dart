@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../l10n/l10n.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
-import '../bass/sub_panel.dart';
-import '../export/export_sheet.dart';
+import 'package:junglengine/features/bass/sub_panel.dart';
+import 'package:junglengine/features/export/export_sheet.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// Everything you press while a loop is running, in thumb reach.
 class ActionBar extends ConsumerWidget {

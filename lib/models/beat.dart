@@ -1,10 +1,10 @@
-import 'chop_pattern.dart';
-import 'kit_pattern.dart';
-import 'kit_slot.dart';
-import 'machine_type.dart';
-import 'steps.dart';
-import 'sub_lane.dart';
-import 'sub_patch.dart';
+import 'package:junglengine/models/chop_pattern.dart';
+import 'package:junglengine/models/kit_pattern.dart';
+import 'package:junglengine/models/kit_slot.dart';
+import 'package:junglengine/models/machine_type.dart';
+import 'package:junglengine/models/steps.dart';
+import 'package:junglengine/models/sub_lane.dart';
+import 'package:junglengine/models/sub_patch.dart';
 
 /// Slice divisions offered by the Chop machine, **per bar of the break**.
 ///

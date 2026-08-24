@@ -7,10 +7,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:junglengine_engine/junglengine_engine.dart';
 
-import 'audio_clip.dart';
-import 'engine.dart';
-import 'pattern_renderer.dart';
-import 'platform_session.dart';
+import 'package:junglengine/audio/audio_clip.dart';
+import 'package:junglengine/audio/engine.dart';
+import 'package:junglengine/audio/pattern_renderer.dart';
+import 'package:junglengine/audio/platform_session.dart';
 
 /// The Rust engine, behind the same interface flutter_soloud sits behind.
 ///

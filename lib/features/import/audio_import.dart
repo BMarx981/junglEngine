@@ -3,11 +3,11 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../audio/audio_clip.dart';
-import '../../audio/decode.dart';
-import '../../audio/wav.dart';
-import '../../models/import_ref.dart';
-import '../library/import_store.dart';
+import 'package:junglengine/audio/audio_clip.dart';
+import 'package:junglengine/audio/decode.dart';
+import 'package:junglengine/audio/wav.dart';
+import 'package:junglengine/features/library/import_store.dart';
+import 'package:junglengine/models/import_ref.dart';
 
 /// Bring your own audio.
 ///

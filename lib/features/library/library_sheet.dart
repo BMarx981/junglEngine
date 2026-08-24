@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../l10n/l10n.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
-import '../import/import_actions.dart';
-import '../pro/pro_controller.dart';
-import 'break_library.dart';
-import 'kit_library.dart';
+import 'package:junglengine/features/import/import_actions.dart';
+import 'package:junglengine/features/library/break_library.dart';
+import 'package:junglengine/features/library/kit_library.dart';
+import 'package:junglengine/features/pro/pro_controller.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// What the project is made of: one break and one kit.
 ///

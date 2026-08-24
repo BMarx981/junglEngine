@@ -3,8 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import '../../audio/audio_clip.dart';
-import '../../theme.dart';
+import 'package:junglengine/audio/audio_clip.dart';
+import 'package:junglengine/theme.dart';
 
 /// A clip reduced to something drawable.
 ///

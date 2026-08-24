@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
-import 'audio_clip.dart';
-import 'pattern_renderer.dart';
+import 'package:junglengine/audio/audio_clip.dart';
+import 'package:junglengine/audio/pattern_renderer.dart';
 
 /// What the UI is allowed to know about playback.
 ///

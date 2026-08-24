@@ -1,12 +1,12 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import '../models/beat.dart';
-import '../models/chop_pattern.dart';
-import '../models/kit_pattern.dart';
-import '../models/steps.dart';
-import 'audio_clip.dart';
-import 'sub_voice.dart';
+import 'package:junglengine/audio/audio_clip.dart';
+import 'package:junglengine/audio/sub_voice.dart';
+import 'package:junglengine/models/beat.dart';
+import 'package:junglengine/models/chop_pattern.dart';
+import 'package:junglengine/models/kit_pattern.dart';
+import 'package:junglengine/models/steps.dart';
 
 /// One Beat's turn on the timeline.
 ///

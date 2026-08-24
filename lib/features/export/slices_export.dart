@@ -4,14 +4,14 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../audio/audio_clip.dart';
-import '../../audio/wav.dart';
-import '../../models/beat.dart';
-import '../../models/kit_pattern.dart';
-import '../../models/step_mod.dart';
-import '../bass/note_names.dart';
-import 'midi.dart';
-import 'wav_export.dart';
+import 'package:junglengine/audio/audio_clip.dart';
+import 'package:junglengine/audio/wav.dart';
+import 'package:junglengine/features/bass/note_names.dart';
+import 'package:junglengine/features/export/midi.dart';
+import 'package:junglengine/features/export/wav_export.dart';
+import 'package:junglengine/models/beat.dart';
+import 'package:junglengine/models/kit_pattern.dart';
+import 'package:junglengine/models/step_mod.dart';
 
 /// What a step modifier is called inside an exported sample name.
 ///

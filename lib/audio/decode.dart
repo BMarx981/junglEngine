@@ -3,8 +3,8 @@ import 'dart:typed_data';
 
 import 'package:junglengine_decode/junglengine_decode.dart';
 
-import 'audio_clip.dart';
-import 'wav.dart';
+import 'package:junglengine/audio/audio_clip.dart';
+import 'package:junglengine/audio/wav.dart';
 
 /// How much of a file an import will decode.
 ///

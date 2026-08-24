@@ -2,9 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
-import '../../audio/audio_clip.dart';
-import '../../audio/soloud_engine.dart';
-import '../../models/break_ref.dart';
+import 'package:junglengine/audio/audio_clip.dart';
+import 'package:junglengine/audio/soloud_engine.dart';
+import 'package:junglengine/models/break_ref.dart';
 
 /// The bundled breaks.
 ///

@@ -4,32 +4,32 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../audio/audio_clip.dart';
-import '../audio/engine.dart';
-import '../audio/lira_engine.dart';
-import '../audio/pattern_renderer.dart';
-import '../audio/soloud_engine.dart';
-import '../features/export/slices_export.dart';
-import '../features/export/wav_export.dart';
-import '../features/grid/scramble.dart';
-import '../features/grid/slice_analysis.dart';
-import '../features/import/audio_import.dart';
-import '../features/library/break_library.dart';
-import '../features/library/import_store.dart';
-import '../features/library/kit_library.dart';
-import '../features/telemetry/telemetry.dart';
-import '../models/beat.dart';
-import '../models/break_ref.dart';
-import '../models/chop_pattern.dart';
-import '../models/kit_pattern.dart';
-import '../models/kit_ref.dart';
-import '../models/machine_type.dart';
-import '../models/project.dart';
-import '../models/song.dart';
-import '../models/step_mod.dart';
-import '../models/steps.dart';
-import '../models/sub_lane.dart';
-import 'project_store.dart';
+import 'package:junglengine/audio/audio_clip.dart';
+import 'package:junglengine/audio/engine.dart';
+import 'package:junglengine/audio/lira_engine.dart';
+import 'package:junglengine/audio/pattern_renderer.dart';
+import 'package:junglengine/audio/soloud_engine.dart';
+import 'package:junglengine/features/export/slices_export.dart';
+import 'package:junglengine/features/export/wav_export.dart';
+import 'package:junglengine/features/grid/scramble.dart';
+import 'package:junglengine/features/grid/slice_analysis.dart';
+import 'package:junglengine/features/import/audio_import.dart';
+import 'package:junglengine/features/library/break_library.dart';
+import 'package:junglengine/features/library/import_store.dart';
+import 'package:junglengine/features/library/kit_library.dart';
+import 'package:junglengine/features/telemetry/telemetry.dart';
+import 'package:junglengine/models/beat.dart';
+import 'package:junglengine/models/break_ref.dart';
+import 'package:junglengine/models/chop_pattern.dart';
+import 'package:junglengine/models/kit_pattern.dart';
+import 'package:junglengine/models/kit_ref.dart';
+import 'package:junglengine/models/machine_type.dart';
+import 'package:junglengine/models/project.dart';
+import 'package:junglengine/models/song.dart';
+import 'package:junglengine/models/step_mod.dart';
+import 'package:junglengine/models/steps.dart';
+import 'package:junglengine/models/sub_lane.dart';
+import 'package:junglengine/state/project_store.dart';
 
 /// Whether to run the Rust engine instead of flutter_soloud.
 ///
@@ -913,11 +913,7 @@ class StudioController extends Notifier<StudioState> {
     // not quietly undo the accent.
     final next = semitone == null
         ? const SubStep.rest()
-        : SubStep(
-            semitone: semitone,
-            tie: current.tie,
-            accent: current.accent,
-          );
+        : SubStep(semitone: semitone, tie: current.tie, accent: current.accent);
     _commit(beat.copyWith(sub: beat.sub.withStep(step, next)));
   }
 

@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../l10n/l10n.dart';
-import '../../state/studio.dart';
-import 'audio_import.dart';
-import 'break_import_screen.dart';
-import 'import_actions.dart';
+import 'package:junglengine/features/import/audio_import.dart';
+import 'package:junglengine/features/import/break_import_screen.dart';
+import 'package:junglengine/features/import/import_actions.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/state/studio.dart';
 
 /// Audio handed to the app from outside it.
 ///

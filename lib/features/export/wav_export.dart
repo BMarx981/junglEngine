@@ -2,9 +2,9 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
-import '../../audio/engine.dart';
-import '../../audio/pattern_renderer.dart';
-import '../../audio/wav.dart';
+import 'package:junglengine/audio/engine.dart';
+import 'package:junglengine/audio/pattern_renderer.dart';
+import 'package:junglengine/audio/wav.dart';
 
 /// How many repeats of the pattern a loop export may be.
 const List<int> exportBarChoices = [1, 2, 4, 8];

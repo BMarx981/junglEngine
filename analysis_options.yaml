@@ -21,6 +21,10 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
+    # Every import of our own code names the package. `../../state/studio.dart`
+    # tells you how far up the tree the file is and nothing about what it is,
+    # and it changes meaning when a file moves.
+    always_use_package_imports: true
     # avoid_print: false  # Uncomment to disable the `avoid_print` rule
     # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
 

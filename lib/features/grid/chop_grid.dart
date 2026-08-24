@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../models/chop_pattern.dart';
-import '../../models/step_mod.dart';
-import '../../models/steps.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
-import '../transport/playhead_painter.dart';
-import 'slice_analysis.dart';
-import 'step_mod_sheet.dart';
+import 'package:junglengine/features/grid/slice_analysis.dart';
+import 'package:junglengine/features/grid/step_mod_sheet.dart';
+import 'package:junglengine/features/transport/playhead_painter.dart';
+import 'package:junglengine/models/chop_pattern.dart';
+import 'package:junglengine/models/step_mod.dart';
+import 'package:junglengine/models/steps.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// The break step grid: rows are slices, columns are steps.
 ///

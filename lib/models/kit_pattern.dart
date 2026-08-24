@@ -1,4 +1,4 @@
-import 'steps.dart';
+import 'package:junglengine/models/steps.dart';
 
 /// Slots in a Kit machine. Eight, and that is the ceiling: see the Kit machine
 /// spec in CLAUDE.md.

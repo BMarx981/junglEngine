@@ -4,8 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
-import 'entitlement_store.dart';
-import 'pro_state.dart';
+import 'package:junglengine/features/pro/entitlement_store.dart';
+import 'package:junglengine/features/pro/pro_state.dart';
 
 /// The store, behind an interface.
 ///

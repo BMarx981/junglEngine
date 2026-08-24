@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../l10n/l10n.dart';
-import '../../models/beat.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
-import '../library/library_sheet.dart';
+import 'package:junglengine/features/library/library_sheet.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/models/beat.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// Tempo and slice division. The two settings that change how everything else
 /// sounds, so they live at the top and nowhere else.

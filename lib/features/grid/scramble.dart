@@ -1,8 +1,8 @@
 import 'dart:math';
 
-import '../../models/chop_pattern.dart';
-import '../../models/steps.dart';
-import 'slice_analysis.dart';
+import 'package:junglengine/features/grid/slice_analysis.dart';
+import 'package:junglengine/models/chop_pattern.dart';
+import 'package:junglengine/models/steps.dart';
 
 /// Generates a rearrangement that still sounds like a breakbeat.
 ///

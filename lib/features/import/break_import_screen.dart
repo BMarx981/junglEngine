@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../l10n/l10n.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
-import 'audio_import.dart';
-import 'tap_tempo.dart';
-import 'waveform.dart';
+import 'package:junglengine/features/import/audio_import.dart';
+import 'package:junglengine/features/import/tap_tempo.dart';
+import 'package:junglengine/features/import/waveform.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// Say where the loop is and how fast it is.
 ///

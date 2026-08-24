@@ -2,10 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../l10n/l10n.dart';
-import '../../theme.dart';
-import 'pro_controller.dart';
-import 'pro_state.dart';
+import 'package:junglengine/features/pro/pro_controller.dart';
+import 'package:junglengine/features/pro/pro_state.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/theme.dart';
 
 /// The name and the sentence under it, for one Pro feature.
 (String, String) _proFeatureCopy(AppLocalizations l10n, ProFeature feature) =>

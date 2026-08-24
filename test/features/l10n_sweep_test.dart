@@ -5,16 +5,17 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
 import 'package:junglengine/features/bass/sub_editor.dart';
 import 'package:junglengine/features/bass/sub_lane_view.dart';
 import 'package:junglengine/features/bass/sub_panel.dart';
 import 'package:junglengine/features/export/export_sheet.dart';
 import 'package:junglengine/features/grid/chop_grid.dart';
+import 'package:junglengine/features/pro/pro_controller.dart';
 import 'package:junglengine/features/song/beat_bar.dart';
 import 'package:junglengine/features/song/new_beat_sheet.dart';
 import 'package:junglengine/features/studio_screen.dart';
 import 'package:junglengine/features/transport/action_bar.dart';
-import 'package:junglengine/features/pro/pro_controller.dart';
 import 'package:junglengine/l10n/l10n.dart';
 import 'package:junglengine/state/studio.dart';
 import 'package:junglengine/theme.dart';

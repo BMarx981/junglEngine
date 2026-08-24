@@ -4,12 +4,12 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
 
-import '../models/kit_slot.dart';
-import 'audio_clip.dart';
-import 'engine.dart';
-import 'pattern_renderer.dart';
-import 'platform_session.dart';
-import 'wav.dart';
+import 'package:junglengine/audio/audio_clip.dart';
+import 'package:junglengine/audio/engine.dart';
+import 'package:junglengine/audio/pattern_renderer.dart';
+import 'package:junglengine/audio/platform_session.dart';
+import 'package:junglengine/audio/wav.dart';
+import 'package:junglengine/models/kit_slot.dart';
 
 /// flutter_soloud backed engine.
 ///

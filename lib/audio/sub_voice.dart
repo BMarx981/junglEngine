@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import '../models/sub_patch.dart';
+import 'package:junglengine/models/sub_patch.dart';
 
 /// The whole sub synth: one monophonic voice.
 ///

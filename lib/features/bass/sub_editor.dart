@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../l10n/l10n.dart';
-import '../../models/steps.dart';
-import '../../models/sub_lane.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
-import '../transport/bar_strip.dart';
-import '../transport/playhead_painter.dart';
-import 'note_names.dart';
+import 'package:junglengine/features/bass/note_names.dart';
+import 'package:junglengine/features/transport/bar_strip.dart';
+import 'package:junglengine/features/transport/playhead_painter.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/models/steps.dart';
+import 'package:junglengine/models/sub_lane.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// Rows of the roll: every semitone the lane can hold, top note first.
 const int _rowCount = subMaxSemitone - subMinSemitone + 1;
@@ -50,17 +50,16 @@ class SubEditor extends ConsumerStatefulWidget {
   /// How tall one semitone is, for the same reason.
   static const double rowHeight = _rowHeight;
 
-  static Future<void> show(BuildContext context) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        backgroundColor: JungleTheme.surface,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-        ),
-        builder: (_) => const SubEditor(),
-      );
+  static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: JungleTheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+    ),
+    builder: (_) => const SubEditor(),
+  );
 
   @override
   ConsumerState<SubEditor> createState() => _SubEditorState();
@@ -396,9 +395,7 @@ class _Inspector extends StatelessWidget {
               semitone == null ? '--' : noteName(rootMidi + semitone),
               style: JungleTheme.readout(
                 fontSize: 16,
-                color: semitone == null
-                    ? JungleTheme.textDim
-                    : JungleTheme.sub,
+                color: semitone == null ? JungleTheme.textDim : JungleTheme.sub,
               ),
             ),
             const Spacer(),
@@ -582,8 +579,7 @@ class _RollPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final columnWidth = size.width / steps.length;
 
-    double yFor(int semitone) =>
-        (_rowForSemitone(semitone) + 0.5) * _rowHeight;
+    double yFor(int semitone) => (_rowForSemitone(semitone) + 0.5) * _rowHeight;
 
     // The keyboard, laid on its side. Black keys sit darker so a run of notes
     // can be read as an interval and not just as a stack of blocks.

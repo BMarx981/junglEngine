@@ -5,12 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../audio/engine.dart';
-import '../../l10n/l10n.dart';
-import '../../models/beat.dart';
-import '../../models/song.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
+import 'package:junglengine/audio/engine.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/models/beat.dart';
+import 'package:junglengine/models/song.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// The arrangement: a vertical list of Beat cards, top to bottom, each with a
 /// repeat count.

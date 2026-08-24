@@ -2,9 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-import 'app_localizations.dart';
+import 'package:junglengine/l10n/app_localizations.dart';
 
-export 'app_localizations.dart';
+export 'package:junglengine/l10n/app_localizations.dart';
 
 /// Shorthand for the generated lookup, because `context.l10n.foo` reads at a
 /// glance and `AppLocalizations.of(context)!.foo` does not, at forty call sites.

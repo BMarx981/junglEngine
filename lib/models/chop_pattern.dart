@@ -1,5 +1,5 @@
-import 'step_mod.dart';
-import 'steps.dart';
+import 'package:junglengine/models/step_mod.dart';
+import 'package:junglengine/models/steps.dart';
 
 /// One filled step of the Chop grid: which slice, and what is done to it.
 class ChopStep {

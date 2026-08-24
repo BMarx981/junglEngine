@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../l10n/l10n.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
-import '../pro/paywall.dart';
-import '../pro/pro_controller.dart';
-import 'audio_import.dart';
-import 'break_import_screen.dart';
+import 'package:junglengine/features/import/audio_import.dart';
+import 'package:junglengine/features/import/break_import_screen.dart';
+import 'package:junglengine/features/pro/paywall.dart';
+import 'package:junglengine/features/pro/pro_controller.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// What to tell the user about an import that did not work.
 ///

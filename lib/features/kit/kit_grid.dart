@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../l10n/l10n.dart';
-import '../../models/kit_pattern.dart';
-import '../../models/kit_ref.dart';
-import '../../models/steps.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
-import '../transport/playhead_painter.dart';
-import 'kit_slot_sheet.dart';
+import 'package:junglengine/features/kit/kit_slot_sheet.dart';
+import 'package:junglengine/features/transport/playhead_painter.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/models/kit_pattern.dart';
+import 'package:junglengine/models/kit_ref.dart';
+import 'package:junglengine/models/steps.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// The Kit machine: eight one shot slots down, sixteen steps across.
 ///

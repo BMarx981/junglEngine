@@ -2,11 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../l10n/l10n.dart';
-import '../../audio/engine.dart';
-import '../../models/steps.dart';
-import '../../state/studio.dart';
-import '../../theme.dart';
+import 'package:junglengine/audio/engine.dart';
+import 'package:junglengine/l10n/l10n.dart';
+import 'package:junglengine/models/steps.dart';
+import 'package:junglengine/state/studio.dart';
+import 'package:junglengine/theme.dart';
 
 /// Which bar of the open Beat the grid is showing.
 ///
