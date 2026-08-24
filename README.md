@@ -44,11 +44,16 @@ and step timing is sample accurate instead of being at the mercy of Dart timer
 jitter. It also keeps `AudioEngine` narrow enough that the Lira Rust engine can
 replace it at M4 without the grid, the sequencer or the exporter noticing.
 
-That swap has started. `packages/junglengine_engine` holds the mixer and the
-sub synth ported to Rust, proven sample identical to the Dart ones by
-`test/audio/rust_parity_test.dart`, and nothing in the app calls it yet. The
-reason to swap turns out not to be CPU: read `docs/M4.md` before assuming it
-is.
+That swap has happened, behind a flag. `packages/junglengine_engine` holds the
+mixer, the sub synth, the device and the C ABI, in Rust, and
+`lib/audio/lira_engine.dart` implements the same `AudioEngine` over it.
+`--dart-define=JE_LIRA_ENGINE=true` picks it; flutter_soloud is still what
+ships. Both stay until the A/B on a phone says which one wins, and the reason
+to swap turns out not to be CPU: read `docs/M4.md` before assuming it is.
+
+**Building the app therefore needs a Rust toolchain** (<https://rustup.rs>).
+The iOS, macOS and Android builds compile the crate themselves and add the
+targets they need; without cargo on `PATH` they stop with an error saying so.
 
 A `RenderSpec` is a list of sections, each one a Beat's turn on the timeline.
 A pattern is one section looping; a song is one section per pass. The sequencer
@@ -58,6 +63,9 @@ across machine types for free.
 - `lib/audio/engine.dart` — the interface everything else talks to
 - `lib/audio/pattern_renderer.dart` — the mixer, the only thing that makes sound
 - `lib/audio/soloud_engine.dart` — flutter_soloud implementation
+- `lib/audio/lira_engine.dart` — the Rust engine, behind `JE_LIRA_ENGINE`
+- `lib/audio/platform_session.dart` — claiming the platform audio session,
+  which is a platform concern rather than an engine one, so both share it
 - `lib/audio/sub_voice.dart` — the sub synth, all five parameters of it
 
 ## Machines and Beats

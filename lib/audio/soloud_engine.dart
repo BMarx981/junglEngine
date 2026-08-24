@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
-import 'package:audio_session/audio_session.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
 
@@ -8,6 +8,7 @@ import '../models/kit_slot.dart';
 import 'audio_clip.dart';
 import 'engine.dart';
 import 'pattern_renderer.dart';
+import 'platform_session.dart';
 import 'wav.dart';
 
 /// flutter_soloud backed engine.
@@ -113,37 +114,13 @@ class SoLoudAudioEngine implements AudioEngine {
   @override
   Future<void> initialize() async {
     if (_initialized) return;
-    await _configureAudioSession();
+    await configureAudioSession(stop);
     await SoLoud.instance.init(
       sampleRate: sampleRate,
       channels: Channels.stereo,
     );
     SoLoud.instance.setGlobalVolume(1);
     _initialized = true;
-  }
-
-  /// flutter_soloud deliberately leaves the platform audio session alone, so
-  /// the app has to claim it.
-  ///
-  /// Without this, iOS defaults to the ambient category and the ringer switch
-  /// silences the app. Picking up a phone with the switch on and hearing
-  /// nothing is not a verdict on the groove.
-  Future<void> _configureAudioSession() async {
-    try {
-      final session = await AudioSession.instance;
-      await session.configure(const AudioSessionConfiguration.music());
-      await session.setActive(true);
-
-      // A phone call or another app taking the output leaves the feeder
-      // pushing into a stream nobody is draining. Stop instead.
-      session.interruptionEventStream.listen((event) {
-        if (event.begin) unawaited(stop());
-      });
-      session.becomingNoisyEventStream.listen((_) => unawaited(stop()));
-    } on Object catch (error) {
-      // Not fatal: on desktop there may be no session to configure.
-      debugPrint('junglengine: audio session not configured ($error)');
-    }
   }
 
   @override

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../audio/audio_clip.dart';
 import '../audio/engine.dart';
+import '../audio/lira_engine.dart';
 import '../audio/pattern_renderer.dart';
 import '../audio/soloud_engine.dart';
 import '../features/export/slices_export.dart';
@@ -30,9 +31,22 @@ import '../models/steps.dart';
 import '../models/sub_lane.dart';
 import 'project_store.dart';
 
+/// Whether to run the Rust engine instead of flutter_soloud.
+///
+/// Both ship while the M4 A/B is being done, because the honest answer to
+/// "is this better" is a number taken on a phone with each of them, and a
+/// build that can only be one of them cannot produce that number. Off by
+/// default: `--dart-define=JE_LIRA_ENGINE=true` turns it on.
+///
+/// The whole switch is the line below, which is what `AudioEngine` has been
+/// for since M0. See docs/M4.md.
+const bool useLiraEngine = bool.fromEnvironment('JE_LIRA_ENGINE');
+
 /// The one engine instance for the app.
 final audioEngineProvider = Provider<AudioEngine>((ref) {
-  final engine = SoLoudAudioEngine();
+  final AudioEngine engine = useLiraEngine
+      ? LiraAudioEngine()
+      : SoLoudAudioEngine();
   ref.onDispose(() => unawaited(engine.shutdown()));
   return engine;
 });

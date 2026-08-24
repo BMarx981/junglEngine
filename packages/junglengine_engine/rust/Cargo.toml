@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
-# The mixer, in Rust. Everything here is what `lib/audio/pattern_renderer.dart`
-# and `lib/audio/sub_voice.dart` already do, ported so that it can run inside
-# an audio callback instead of ahead of one. See docs/M4.md.
+# The mixer, in Rust, and the device it runs on. Everything the mixer does is
+# what `lib/audio/pattern_renderer.dart` and `lib/audio/sub_voice.dart` already
+# do, ported so that it can run inside an audio callback instead of ahead of
+# one. See docs/M4.md.
 
 [dependencies]
 # The wire format between Dart and the engine is the project's own JSON, the
@@ -16,8 +17,20 @@ publish = false
 # direct dependency.
 serde_json = "1"
 
+# The output device. CoreAudio on iOS and macOS, AAudio on Android, all behind
+# one callback. Default features only: no JACK, no ASIO, no PipeWire, none of
+# which a phone has.
+cpal = { version = "0.18", default-features = false }
+
+# The lock free SPSC ring both directions of the control/audio boundary run
+# over. The same crate Lira's controller uses, for the same reason: a mutex on
+# an audio thread is a dropout waiting for a scheduler.
+rtrb = "0.3"
+
 [lib]
-crate-type = ["lib"]
+# `staticlib` is what the iOS and macOS pods link; `cdylib` is what Android
+# loads; `lib` is what the two binaries and the tests here use.
+crate-type = ["lib", "staticlib", "cdylib"]
 bench = false
 
 [profile.release]

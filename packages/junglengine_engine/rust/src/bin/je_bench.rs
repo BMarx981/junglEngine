@@ -10,7 +10,8 @@
 use std::fs;
 use std::time::Instant;
 
-use junglengine_engine::renderer::{Clip, PatternRenderer, Sources};
+use junglengine_engine::plan::{Clip, Plan, Sources};
+use junglengine_engine::renderer::PatternRenderer;
 use junglengine_engine::spec::Spec;
 
 const BLOCK: usize = 1024;
@@ -46,7 +47,7 @@ fn main() {
     for run in 0..=repeats {
         let spec = Spec::from_json_str(&text).expect("spec unparseable");
         let sources = Sources::new(break_clip.clone(), kit_clips.clone());
-        let mut renderer = PatternRenderer::new(spec, sources);
+        let mut renderer = PatternRenderer::new(Plan::new(0, spec, sources));
         let start = Instant::now();
         let mut done = 0usize;
         while done < frames {

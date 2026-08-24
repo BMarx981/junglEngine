@@ -1,0 +1,67 @@
+// The engine's Android build. No Kotlin and no plugin class: the module exists
+// to compile the Rust crate into the shared objects the app packages, and
+// everything else goes over dart:ffi.
+
+group = 'app.hawkstreak.junglengine.engine'
+version = '0.1.0'
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.7.3'
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace 'app.hawkstreak.junglengine.engine'
+    compileSdk 35
+
+    defaultConfig {
+        // Deliberately the app's minimum rather than the engine's.
+        //
+        // The engine itself needs API 26: AAudio, the only low latency output
+        // Android has, arrives there. Declaring 26 here would raise the whole
+        // app's minimum the moment this package is depended on, which is not a
+        // decision that belongs to a package that nothing calls yet. So the
+        // library ships to 24 and the shared object simply fails to load below
+        // 26, where `LiraAudioEngine` falls back to flutter_soloud. When the
+        // A/B says the Rust engine ships, this and the app's minSdk go to 26
+        // together. See docs/M4.md.
+        minSdk 24
+    }
+
+    sourceSets {
+        main.jniLibs.srcDirs = ["${layout.buildDirectory.get()}/jniLibs"]
+    }
+}
+
+def jniLibs = "${layout.buildDirectory.get()}/jniLibs"
+
+tasks.register('buildRustEngine', Exec) {
+    description = 'Compiles the junglEngine audio engine for every ABI.'
+    // Rebuilds when any of the crate's own sources move; cargo decides the
+    // rest.
+    inputs.dir "${projectDir}/../rust/src"
+    inputs.file "${projectDir}/../rust/Cargo.toml"
+    outputs.dir jniLibs
+    commandLine 'sh', "${projectDir}/../rust/build_android.sh",
+        android.ndkDirectory.absolutePath, jniLibs
+}
+
+tasks.configureEach { task ->
+    if (task.name == 'preBuild') {
+        task.dependsOn 'buildRustEngine'
+    }
+}

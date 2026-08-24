@@ -7,13 +7,16 @@
 //! Both machines render here, and so does the Song. Which machine a section
 //! runs is a branch at step fire time, not a second renderer.
 //!
-//! Nothing below the block loop allocates. That is the whole reason this is in
-//! Rust: it runs inside the audio callback, where the Dart mixer could only
-//! ever run ahead of one.
+//! Nothing here allocates and nothing here drops. That is the whole reason
+//! this is in Rust: it runs inside the audio callback, where the Dart mixer
+//! could only ever run ahead of one. Plans arrive built and leave whole, on
+//! the [`PatternRenderer::take_retired`] path, to be dropped on the control
+//! thread.
 
 use std::sync::Arc;
 
-use crate::spec::{midi_to_hz, KitSlot, KitVelocity, Spec, StepMod, SubStep, KIT_SLOT_COUNT};
+use crate::plan::Plan;
+use crate::spec::{midi_to_hz, KitSlot, KitVelocity, StepMod, SubStep, KIT_SLOT_COUNT};
 use crate::sub_voice::{soft_clip, SubVoice};
 
 const MAX_SLICE_VOICES: usize = 4;
@@ -21,49 +24,6 @@ const MAX_SLICE_VOICES: usize = 4;
 /// Eight slots can fire on one step while the tails of the step before are
 /// still ringing, so this is deliberately more than eight.
 const MAX_KIT_VOICES: usize = 16;
-
-/// Decoded audio, interleaved stereo, already at the engine's rate.
-///
-/// Held behind an `Arc` so a voice can keep the buffer it is reading alive
-/// across a spec swap, exactly as the Dart renderer relies on the GC to.
-#[derive(Clone)]
-pub struct Clip {
-    pub samples: Arc<Vec<f32>>,
-}
-
-impl Clip {
-    pub fn new(samples: Vec<f32>) -> Self {
-        Clip {
-            samples: Arc::new(samples),
-        }
-    }
-
-    pub fn silent(frames: usize) -> Self {
-        Clip::new(vec![0.0; frames * 2])
-    }
-
-    pub fn frames(&self) -> usize {
-        self.samples.len() / 2
-    }
-}
-
-/// Everything the renderer needs that is not pattern data: the audio itself.
-#[derive(Clone)]
-pub struct Sources {
-    pub break_clip: Clip,
-    /// One clip per Kit slot, in slot order. Empty until the project kit has
-    /// loaded, which only silences Kit Beats.
-    pub kit_clips: Vec<Clip>,
-}
-
-impl Sources {
-    pub fn new(break_clip: Clip, kit_clips: Vec<Clip>) -> Self {
-        Sources {
-            break_clip,
-            kit_clips,
-        }
-    }
-}
 
 /// Where the sequencer is, in terms the UI understands.
 #[derive(Clone, Copy, Debug, Default)]
@@ -77,21 +37,23 @@ pub struct RenderPosition {
 }
 
 pub struct PatternRenderer {
-    spec: Spec,
-    sources: Sources,
+    /// What is playing, built and owned elsewhere. Never constructed here and
+    /// never dropped here.
+    plan: Box<Plan>,
+
+    /// What takes over at the next bar line, if anything. See
+    /// [`PatternRenderer::queue_plan`].
+    queued: Option<Box<Plan>>,
+
+    /// Where a plan retired inside [`PatternRenderer::render`] waits for the
+    /// caller to collect it. One slot is enough: only a queued swap retires a
+    /// plan from inside the render loop, only one plan can be queued at a
+    /// time, and the caller drains this after every render.
+    retired: Option<Box<Plan>>,
 
     sub: SubVoice,
     fade_frames: f64,
     attack_frames: f64,
-
-    /// Frame each step starts on, plus one past the end. Rebuilt on every
-    /// tempo or swing change, rounded from an exact running position so
-    /// rounding cannot accumulate into drift, and carrying each Beat's swing
-    /// in the offsets of its odd steps.
-    boundaries: Vec<i64>,
-    section_of_step: Vec<usize>,
-    section_start_step: Vec<usize>,
-    frames_per_step: f64,
 
     voices: [SliceVoice; MAX_SLICE_VOICES],
     kit_voices: [KitVoice; MAX_KIT_VOICES],
@@ -103,18 +65,15 @@ pub struct PatternRenderer {
 }
 
 impl PatternRenderer {
-    pub fn new(spec: Spec, sources: Sources) -> Self {
-        let sample_rate = spec.sample_rate as f64;
+    pub fn new(plan: Box<Plan>) -> Self {
+        let sample_rate = plan.spec.sample_rate as f64;
         let mut renderer = PatternRenderer {
-            sub: SubVoice::new(spec.sample_rate),
+            sub: SubVoice::new(plan.spec.sample_rate),
             fade_frames: (sample_rate * 0.0015).round().max(1.0),
             attack_frames: (sample_rate * 0.0004).round().max(1.0),
-            spec,
-            sources,
-            boundaries: Vec::new(),
-            section_of_step: Vec::new(),
-            section_start_step: Vec::new(),
-            frames_per_step: 0.0,
+            plan,
+            queued: None,
+            retired: None,
             voices: Default::default(),
             kit_voices: Default::default(),
             step_index: 0,
@@ -122,43 +81,31 @@ impl PatternRenderer {
             section_index: -1,
             tail: false,
         };
-        renderer.build_timeline();
         renderer.rewind();
         renderer
     }
 
-    pub fn spec(&self) -> &Spec {
-        &self.spec
-    }
-
-    pub fn sources(&self) -> &Sources {
-        &self.sources
+    /// Which publication is sounding. The callback stamps this into the shared
+    /// transport so the Dart side knows which spec the step it is drawing
+    /// belongs to.
+    pub fn plan_id(&self) -> u64 {
+        self.plan.id
     }
 
     /// Steps in the whole timeline: one bar for a one bar pattern, the entire
     /// arrangement in song mode.
     pub fn step_count(&self) -> usize {
-        self.section_of_step.len()
-    }
-
-    /// Frames in one pass of the timeline.
-    pub fn loop_frames(&self) -> i64 {
-        *self.boundaries.last().unwrap_or(&0)
-    }
-
-    /// How many frames one step lasts at the current tempo, before swing.
-    pub fn frames_per_step(&self) -> f64 {
-        self.frames_per_step
+        self.plan.timeline.step_count()
     }
 
     /// Position within the timeline, in frames. Wraps with the loop.
     pub fn loop_frame(&self) -> i64 {
-        self.boundaries[self.step_index]
+        self.plan.timeline.start_frame_of(self.step_index)
             + (self.step_length(self.step_index) - self.frames_to_next_step)
     }
 
     fn step_length(&self, step: usize) -> i64 {
-        self.boundaries[step + 1] - self.boundaries[step]
+        self.plan.timeline.step_length(step)
     }
 
     /// Whether `next` can be swapped in under the running playhead.
@@ -167,28 +114,43 @@ impl PatternRenderer {
     /// still be sounding afterwards. Everything else about the timeline may
     /// change, which is what lets a card be added to a song, a repeat count be
     /// nudged or the tempo be dragged while the arrangement keeps playing.
-    pub fn can_adopt(&self, next: &Spec, sources: &Sources) -> bool {
-        if next.sample_rate != self.spec.sample_rate {
+    pub fn can_adopt(&self, next: &Plan) -> bool {
+        if next.spec.sample_rate != self.plan.spec.sample_rate {
             return false;
         }
         if !Arc::ptr_eq(
-            &sources.break_clip.samples,
-            &self.sources.break_clip.samples,
+            &next.sources.break_clip.samples,
+            &self.plan.sources.break_clip.samples,
         ) {
             return false;
         }
-        if next.sections.is_empty() {
+        if next.spec.sections.is_empty() {
             return false;
         }
-        let section = self.section_of_step[self.step_index];
-        if section >= next.sections.len() {
+        let section = self.plan.timeline.section_of(self.step_index);
+        if section >= next.spec.sections.len() {
             return false;
         }
-        let playing = &self.spec.sections[section].beat;
-        let replacement = &next.sections[section].beat;
+        let playing = &self.plan.spec.sections[section].beat;
+        let replacement = &next.spec.sections[section].beat;
         playing.id == replacement.id
             && playing.step_count() == replacement.step_count()
             && playing.is_kit == replacement.is_kit
+    }
+
+    /// Whether `next` could be queued to take over at a bar line.
+    ///
+    /// Much narrower than what [`PatternRenderer::can_adopt`] asks, because
+    /// nothing has to survive a queued swap except the material the ringing
+    /// voices are reading from: the pattern is allowed to change completely,
+    /// that is the point of it.
+    pub fn can_queue(&self, next: &Plan) -> bool {
+        next.spec.sample_rate == self.plan.spec.sample_rate
+            && Arc::ptr_eq(
+                &next.sources.break_clip.samples,
+                &self.plan.sources.break_clip.samples,
+            )
+            && !next.spec.sections.is_empty()
     }
 
     /// Swaps in edited data without disturbing the playhead or any voice that
@@ -196,21 +158,24 @@ impl PatternRenderer {
     ///
     /// Tempo, swing and the section list are all allowed to move here. Only
     /// [`PatternRenderer::can_adopt`] decides what is too much; anything it
-    /// refuses needs a new renderer.
-    pub fn update_spec(&mut self, next: Spec, sources: Sources) {
+    /// refuses needs [`PatternRenderer::install`] instead.
+    ///
+    /// Returns the plan that just stopped playing, for the caller to hand back
+    /// to the control thread. Dropping it here would deallocate on the audio
+    /// thread.
+    #[must_use = "the retired plan must be dropped on the control thread"]
+    pub fn adopt(&mut self, next: Box<Plan>) -> Box<Plan> {
         debug_assert!(
-            self.can_adopt(&next, &sources),
-            "update_spec cannot change what is sounding; build a new renderer instead"
+            self.can_adopt(&next),
+            "adopt cannot change what is sounding; install a new plan instead"
         );
-        let section = self.section_of_step[self.step_index];
-        let local = self.step_index - self.section_start_step[section];
+        let section = self.plan.timeline.section_of(self.step_index);
+        let local = self.step_index - self.plan.timeline.section_start(section);
         let previous = self.step_length(self.step_index);
 
-        self.spec = next;
-        self.sources = sources;
-        self.build_timeline();
+        let old = std::mem::replace(&mut self.plan, next);
 
-        self.step_index = self.section_start_step[section] + local;
+        self.step_index = self.plan.timeline.section_start(section) + local;
         let now = self.step_length(self.step_index);
         if previous > 0 && now != previous {
             let scaled =
@@ -218,44 +183,97 @@ impl PatternRenderer {
             self.frames_to_next_step = scaled.min(now).max(1);
         }
         self.section_index = section as i64;
-        let patch = self.spec.sections[self.section_of_step[self.step_index]]
+        let patch = self.plan.spec.sections[self.plan.timeline.section_of(self.step_index)]
             .beat
             .sub_patch;
         self.sub.set_patch(patch);
+        old
     }
 
-    fn build_timeline(&mut self) {
-        let fps = self.spec.sample_rate as f64 * 60.0 / self.spec.bpm / 4.0;
-        self.frames_per_step = fps;
+    /// Replaces what is playing outright and starts again from the top, for a
+    /// change [`PatternRenderer::can_adopt`] refuses: a different break, a
+    /// different machine, a different sample rate.
+    #[must_use = "the retired plan must be dropped on the control thread"]
+    pub fn install(&mut self, next: Box<Plan>) -> Box<Plan> {
+        let old = std::mem::replace(&mut self.plan, next);
+        self.rewind();
+        old
+    }
 
-        let mut boundaries = Vec::new();
-        let mut section_of_step = Vec::new();
-        let mut section_start_step = Vec::new();
-        let mut frame = 0.0f64;
+    /// Lines `next` up to take over at the end of the bar being rendered.
+    ///
+    /// This is how a Beat is changed under a running transport: the swap lands
+    /// on the bar line rather than the instant it was asked for, so choosing
+    /// another Beat mid bar never chops the bar in half. It is deliberately
+    /// not [`PatternRenderer::adopt`]'s job, which is the opposite promise: an
+    /// edit is heard as soon as possible and never moves the playhead.
+    ///
+    /// Returns whatever was queued before, which nothing will now play.
+    #[must_use = "the displaced plan must be dropped on the control thread"]
+    pub fn queue_plan(&mut self, next: Box<Plan>) -> Option<Box<Plan>> {
+        debug_assert!(
+            self.can_queue(&next),
+            "a queued plan must read the same clip at the same rate"
+        );
+        self.queued.replace(next)
+    }
 
-        for (section, entry) in self.spec.sections.iter().enumerate() {
-            let beat = &entry.beat;
-            section_start_step.push(section_of_step.len());
-            // Swing pushes the odd sixteenths late and leaves the even ones
-            // where they were, so the bar still starts and ends where it
-            // should however hard the pattern is shuffled.
-            let offset = beat.swing_offset_fraction() * fps;
-            for local in 0..beat.step_count() {
-                let swung = if local % 2 == 1 { offset } else { 0.0 };
-                boundaries.push((frame + local as f64 * fps + swung).round() as i64);
-                section_of_step.push(section);
-            }
-            frame += beat.step_count() as f64 * fps;
-        }
-        boundaries.push(frame.round() as i64);
+    pub fn has_queued(&self) -> bool {
+        self.queued.is_some()
+    }
 
-        self.boundaries = boundaries;
-        self.section_of_step = section_of_step;
-        self.section_start_step = section_start_step;
+    /// The plan an audition should read: whatever is queued, or what is
+    /// playing when nothing is.
+    ///
+    /// A tap belongs to the Beat that is being switched *to*, not to the bar
+    /// that is finishing. The Dart engine says the same thing by moving its
+    /// current spec the moment a swap is queued, while the renderer keeps
+    /// playing the old one.
+    pub fn pending_plan(&self) -> &Plan {
+        self.queued.as_deref().unwrap_or(&self.plan)
+    }
+
+    /// Drops the queued plan, leaving whatever is playing alone.
+    #[must_use = "the cancelled plan must be dropped on the control thread"]
+    pub fn take_queued(&mut self) -> Option<Box<Plan>> {
+        self.queued.take()
+    }
+
+    /// Collects a plan that [`PatternRenderer::render`] retired at a bar line.
+    /// Drained by the caller after every render, so the slot is always free by
+    /// the time the next bar line comes round.
+    #[must_use = "the retired plan must be dropped on the control thread"]
+    pub fn take_retired(&mut self) -> Option<Box<Plan>> {
+        self.retired.take()
+    }
+
+    /// Takes the queued plan over, at the bar line the render loop has just
+    /// reached.
+    ///
+    /// The playhead goes to the top of the new timeline and every voice is
+    /// left alone, so a slice or a one shot ringing across the join keeps
+    /// ringing, exactly as it does when a song moves from one card to the next.
+    fn adopt_queued(&mut self) {
+        let next = self.queued.take().expect("checked by the caller");
+        let old = std::mem::replace(&mut self.plan, next);
+        self.step_index = 0;
+        // -1 rather than 0, so the next fired step installs the new Beat's
+        // patch.
+        self.section_index = -1;
+        debug_assert!(
+            self.retired.is_none(),
+            "the caller must drain the retired slot after every render"
+        );
+        self.retired = Some(old);
     }
 
     /// Returns to the top of the timeline and clears all voice state, so two
-    /// renders from the same spec are sample identical.
+    /// renders from the same plan are sample identical.
+    ///
+    /// Anything waiting for a bar line is deliberately left alone: unlike the
+    /// Dart renderer, which drops its queue here, this cannot drop. The caller
+    /// takes the queue with [`PatternRenderer::take_queued`] first when a
+    /// rewind should cancel it.
     pub fn rewind(&mut self) {
         self.step_index = 0;
         self.section_index = -1;
@@ -267,7 +285,7 @@ impl PatternRenderer {
             v.active = false;
             v.clip = None;
         }
-        let patch = self.spec.sections[0].beat.sub_patch;
+        let patch = self.plan.spec.sections[0].beat.sub_patch;
         self.sub.set_patch(patch);
         self.sub.reset();
         self.frames_to_next_step = self.step_length(0);
@@ -288,7 +306,14 @@ impl PatternRenderer {
                 self.frames_to_next_step -= chunk;
             }
             if self.frames_to_next_step <= 0 {
-                self.step_index = (self.step_index + 1) % self.step_count();
+                let next = (self.step_index + 1) % self.step_count();
+                // The one place a queued Beat can land: on a bar line, between
+                // the last step of the bar and the first step of the next one.
+                if self.queued.is_some() && self.plan.timeline.is_bar_line(next) {
+                    self.adopt_queued();
+                } else {
+                    self.step_index = next;
+                }
                 self.frames_to_next_step = self.step_length(self.step_index);
                 self.fire_step(self.step_index);
             }
@@ -297,22 +322,23 @@ impl PatternRenderer {
 
     /// Resolves a frame of the timeline to something the UI can draw.
     pub fn position_at(&self, frame: i64) -> RenderPosition {
-        let total = self.loop_frames();
+        let timeline = &self.plan.timeline;
+        let total = timeline.loop_frames();
         let wrapped = if total <= 0 {
             0
         } else {
             frame.rem_euclid(total)
         };
-        let step = self.step_at_frame(wrapped);
-        let section = self.section_of_step[step];
-        let start = self.section_start_step[section];
-        let beat = &self.spec.sections[section].beat;
-        let pass_start = self.boundaries[start];
-        let pass_frames = self.boundaries[start + beat.step_count()] - pass_start;
+        let step = timeline.step_at_frame(wrapped);
+        let section = timeline.section_of(step);
+        let start = timeline.section_start(section);
+        let beat = &self.plan.spec.sections[section].beat;
+        let pass_start = timeline.start_frame_of(start);
+        let pass_frames = timeline.start_frame_of(start + beat.step_count()) - pass_start;
         RenderPosition {
             step: (step - start) as i32,
             step_count: beat.step_count() as i32,
-            entry_index: self.spec.sections[section].entry_index,
+            entry_index: self.plan.spec.sections[section].entry_index,
             position: if pass_frames <= 0 {
                 0.0
             } else {
@@ -321,39 +347,26 @@ impl PatternRenderer {
         }
     }
 
-    /// Which Beat is sounding at `frame`. Separate from
-    /// [`PatternRenderer::position_at`] because the id is a string and the
-    /// position is not: the caller that needs both pays for both.
-    pub fn beat_id_at(&self, frame: i64) -> &str {
-        let total = self.loop_frames();
+    /// Which section is sounding at `frame`. Separate from
+    /// [`PatternRenderer::position_at`] because a Beat id is a string the
+    /// callback must not touch: the Dart side turns this index into an id
+    /// against the spec it published.
+    pub fn section_at(&self, frame: i64) -> i32 {
+        let timeline = &self.plan.timeline;
+        let total = timeline.loop_frames();
         let wrapped = if total <= 0 {
             0
         } else {
             frame.rem_euclid(total)
         };
-        let step = self.step_at_frame(wrapped);
-        &self.spec.sections[self.section_of_step[step]].beat.id
-    }
-
-    fn step_at_frame(&self, frame: i64) -> usize {
-        let mut low = 0usize;
-        let mut high = self.step_count() - 1;
-        while low < high {
-            let mid = (low + high + 1) >> 1;
-            if self.boundaries[mid] <= frame {
-                low = mid;
-            } else {
-                high = mid - 1;
-            }
-        }
-        low
+        timeline.section_of(timeline.step_at_frame(wrapped)) as i32
     }
 
     fn render_chunk(&mut self, out: &mut [f32], at_frame: usize, count: usize) {
-        let clip = &self.sources.break_clip.samples;
-        let clip_frames = self.sources.break_clip.frames();
-        let drum_gain = self.spec.drum_gain;
-        let sub_gain = self.spec.sub_gain;
+        let clip = &self.plan.sources.break_clip.samples;
+        let clip_frames = self.plan.sources.break_clip.frames();
+        let drum_gain = self.plan.spec.drum_gain;
+        let sub_gain = self.plan.spec.sub_gain;
         let attack_frames = self.attack_frames;
         let fade_frames = self.fade_frames;
 
@@ -458,15 +471,15 @@ impl PatternRenderer {
         if self.tail {
             return;
         }
-        let section = self.section_of_step[step];
-        let local = step - self.section_start_step[section];
+        let section = self.plan.timeline.section_of(step);
+        let local = step - self.plan.timeline.section_start(section);
         let step_frames = self.step_length(step);
 
         // Everything the step needs is copied out first, so nothing below
         // holds a borrow on the spec while the voices are touched. All of it
         // is `Copy`: no allocation happens on a step boundary.
         let (is_kit, slice_count, sub_patch, sub_root_midi) = {
-            let beat = &self.spec.sections[section].beat;
+            let beat = &self.plan.spec.sections[section].beat;
             (
                 beat.is_kit,
                 beat.slice_count,
@@ -487,7 +500,7 @@ impl PatternRenderer {
             let mut fires: [Option<(KitVelocity, KitSlot)>; KIT_SLOT_COUNT] =
                 [None; KIT_SLOT_COUNT];
             {
-                let beat = &self.spec.sections[section].beat;
+                let beat = &self.plan.spec.sections[section].beat;
                 for (slot, fire) in fires.iter_mut().enumerate() {
                     if let Some(velocity) = beat.kit[slot][local] {
                         *fire = Some((velocity, beat.slot(slot)));
@@ -500,13 +513,13 @@ impl PatternRenderer {
                 }
             }
         } else {
-            let cell = self.spec.sections[section].beat.chop[local];
+            let cell = self.plan.spec.sections[section].beat.chop[local];
             if let Some(cell) = cell {
                 self.trigger_slice(slice_count, cell.slice, cell.r#mod, step_frames);
             }
         }
 
-        let cell: SubStep = self.spec.sections[section].beat.sub[local];
+        let cell: SubStep = self.plan.spec.sections[section].beat.sub[local];
         match cell.semitone {
             Some(semitone) => {
                 let hz = midi_to_hz((sub_root_midi + semitone) as f64);
@@ -518,7 +531,7 @@ impl PatternRenderer {
     }
 
     fn trigger_slice(&mut self, slice_count: i64, index: i64, r#mod: StepMod, step_frames: i64) {
-        let total = self.sources.break_clip.frames() as i64;
+        let total = self.plan.sources.break_clip.frames() as i64;
         if slice_count <= 0 || index < 0 || index >= slice_count {
             return;
         }
@@ -567,7 +580,7 @@ impl PatternRenderer {
     /// an open hat rings under the next closed hat exactly as it would on a
     /// machine with no choke groups.
     fn trigger_kit(&mut self, slot: usize, velocity: KitVelocity, settings: KitSlot) {
-        let clip = match self.sources.kit_clips.get(slot) {
+        let clip = match self.plan.sources.kit_clips.get(slot) {
             Some(clip) if clip.frames() >= 2 => clip.clone(),
             _ => return,
         };

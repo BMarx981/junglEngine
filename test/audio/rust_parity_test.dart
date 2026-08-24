@@ -1,7 +1,8 @@
 // The Rust engine has to produce the same samples as the Dart mixer, because
 // M4 swaps one for the other underneath an app whose exports people already
 // have. This renders the same specs through both and compares them frame by
-// frame.
+// frame, on both paths: playback, block by block, and export, in one call with
+// the ring out folded back over the head of the file.
 //
 // Not a golden file: nothing is committed. The Dart side writes the source
 // audio it rendered with and the Rust binary reads exactly those bytes, so
@@ -18,6 +19,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:junglengine/audio/audio_clip.dart';
 import 'package:junglengine/audio/pattern_renderer.dart';
+import 'package:junglengine/audio/soloud_engine.dart';
 import 'package:junglengine/models/beat.dart';
 import 'package:junglengine/models/chop_pattern.dart';
 import 'package:junglengine/models/kit_pattern.dart';
@@ -113,10 +115,49 @@ void main() {
       });
     }
 
+    /// Export takes a different route through the same mixer: one call rather
+    /// than a block loop, and a tail rendered past the end and folded back over
+    /// the start. It has to agree sample for sample too, or moving playback to
+    /// Rust quietly forks the mixer in two and an exported file stops being
+    /// what was playing.
+    void offlineParity(String name, RenderSpec spec) {
+      test('$name, exported', () {
+        final dart = _renderOfflineInDart(spec);
+        final rust = _renderInRust(binary, work, '${name}_offline', spec,
+            offline: true);
+
+        expect(rust.length, dart.length);
+        var worst = 0.0;
+        var worstAt = -1;
+        for (var i = 0; i < dart.length; i++) {
+          final diff = (dart[i] - rust[i]).abs();
+          if (diff > worst) {
+            worst = diff;
+            worstAt = i;
+          }
+        }
+        expect(
+          worst,
+          lessThan(tolerance),
+          reason: worstAt < 0
+              ? 'sample identical'
+              : 'worst sample differs by $worst at frame ${worstAt ~/ 2} '
+                    '(dart ${dart[worstAt]}, rust ${rust[worstAt]})',
+        );
+      });
+    }
+
     parity('a chop pattern with every step modifier and swing', _chopSpec());
     parity('a kit pattern with velocities, volumes and pitch', _kitSpec());
     parity('a song running both machines back to back', _songSpec());
     parity('a sub lane of ties, accents and glide', _subSpec());
+
+    offlineParity('a chop pattern with every step modifier and swing',
+        _chopSpec());
+    offlineParity('a kit pattern with velocities, volumes and pitch',
+        _kitSpec());
+    offlineParity('a song running both machines back to back', _songSpec());
+    offlineParity('a sub lane of ties, accents and glide', _subSpec());
   }, skip: cargo == null ? 'no cargo on PATH: the Rust engine was not built' : null);
 }
 
@@ -126,6 +167,9 @@ String? _cargoPath() {
   final path = (which.stdout as String).trim();
   return path.isEmpty ? null : path;
 }
+
+Float32List _renderOfflineInDart(RenderSpec spec) =>
+    renderPatternOffline(spec, renderFrames);
 
 Float32List _renderInDart(RenderSpec spec) {
   final renderer = PatternRenderer(spec);
@@ -145,8 +189,9 @@ Float32List _renderInRust(
   File binary,
   Directory work,
   String name,
-  RenderSpec spec,
-) {
+  RenderSpec spec, {
+  bool offline = false,
+}) {
   final slug = name.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
   final breakPath = '${work.path}/$slug.break.f32';
   _writeClip(breakPath, spec.breakClip);
@@ -157,19 +202,16 @@ Float32List _renderInRust(
     kitPaths.add(path);
   }
 
+  // The engine's own wire format, plus where this fixture's audio was written.
+  // Using [RenderSpec.toEngineJson] rather than a second hand rolled encoder
+  // is the point: what the parity test compares is what the app actually
+  // sends.
   final specPath = '${work.path}/$slug.json';
   File(specPath).writeAsStringSync(
     jsonEncode({
-      'sampleRate': spec.sampleRate,
-      'bpm': spec.bpm,
-      'drumGain': spec.drumGain,
-      'subGain': spec.subGain,
+      ...spec.toEngineJson(),
       'breakPath': breakPath,
       'kitPaths': kitPaths,
-      'sections': [
-        for (final section in spec.sections)
-          {'entryIndex': section.entryIndex, 'beat': section.beat.toJson()},
-      ],
     }),
   );
 
@@ -178,6 +220,7 @@ Float32List _renderInRust(
     specPath,
     '$renderFrames',
     outPath,
+    if (offline) '--offline',
   ]);
   expect(run.exitCode, 0, reason: 'je_render failed:\n${run.stderr}');
 

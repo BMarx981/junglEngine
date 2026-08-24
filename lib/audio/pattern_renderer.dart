@@ -77,6 +77,27 @@ class RenderSpec {
   /// Whether this is an arrangement rather than one looping pattern.
   bool get isSong => sections.first.entryIndex >= 0;
 
+  /// This spec as the engine's wire format.
+  ///
+  /// Deliberately the shape a saved project holds: a section's `beat` is
+  /// exactly what [Beat.toJson] writes, so the file format, the FFI boundary
+  /// and the parity fixtures are one format and there is only one thing for
+  /// `packages/junglengine_engine/rust/src/spec.rs` to keep in step with.
+  ///
+  /// The audio itself is not in here. Clips cross the boundary once, when they
+  /// are loaded, and a spec published sixty times a second during a drag
+  /// refers to what is already there.
+  Map<String, Object?> toEngineJson() => {
+    'sampleRate': sampleRate,
+    'bpm': bpm,
+    'drumGain': drumGain,
+    'subGain': subGain,
+    'sections': [
+      for (final section in sections)
+        {'entryIndex': section.entryIndex, 'beat': section.beat.toJson()},
+    ],
+  };
+
   /// Bars in one pass of the timeline: one Beat's length, or the whole
   /// arrangement's.
   int get bars {

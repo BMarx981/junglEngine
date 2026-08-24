@@ -1,6 +1,11 @@
 //! Renders a fixture spec to a raw f32 file, for the Dart parity test.
 //!
-//!   je_render <spec.json> <frames> <out.f32>
+//!   je_render <spec.json> <frames> <out.f32> [--offline]
+//!
+//! `--offline` takes the export path instead of the playback one: the whole
+//! render in one call, with the ring out folded back over the head of the
+//! file. Export has to agree with the Dart mixer sample for sample too, or
+//! moving playback to Rust quietly forks the mixer in two.
 //!
 //! The spec names the source audio it needs, so the Dart side writes the clips
 //! it rendered with and this reads exactly those bytes. Nothing about the
@@ -10,7 +15,9 @@
 use std::fs;
 use std::io::Write;
 
-use junglengine_engine::renderer::{Clip, PatternRenderer, Sources};
+use junglengine_engine::offline::render_offline;
+use junglengine_engine::plan::{Clip, Plan, Sources};
+use junglengine_engine::renderer::PatternRenderer;
 use junglengine_engine::spec::Spec;
 
 /// Blocks, deliberately not one call: a block boundary that does not fall on a
@@ -19,10 +26,11 @@ const BLOCK: usize = 1024;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 4 {
-        eprintln!("usage: je_render <spec.json> <frames> <out.f32>");
+    if args.len() < 4 || args.len() > 5 {
+        eprintln!("usage: je_render <spec.json> <frames> <out.f32> [--offline]");
         std::process::exit(2);
     }
+    let offline = args.get(4).map(String::as_str) == Some("--offline");
     let text = fs::read_to_string(&args[1]).expect("spec unreadable");
     let frames: usize = args[2].parse().expect("frames is not a number");
     let spec = Spec::from_json_str(&text).expect("spec unparseable");
@@ -39,16 +47,22 @@ fn main() {
         })
         .unwrap_or_default();
 
-    let mut renderer = PatternRenderer::new(spec, Sources::new(break_clip, kit_clips));
-    let mut out = vec![0.0f32; frames * 2];
-    let mut block = vec![0.0f32; BLOCK * 2];
-    let mut done = 0usize;
-    while done < frames {
-        let count = BLOCK.min(frames - done);
-        renderer.render(&mut block, count);
-        out[done * 2..(done + count) * 2].copy_from_slice(&block[..count * 2]);
-        done += count;
-    }
+    let plan = Plan::new(0, spec, Sources::new(break_clip, kit_clips));
+    let out = if offline {
+        render_offline(plan, frames)
+    } else {
+        let mut renderer = PatternRenderer::new(plan);
+        let mut out = vec![0.0f32; frames * 2];
+        let mut block = vec![0.0f32; BLOCK * 2];
+        let mut done = 0usize;
+        while done < frames {
+            let count = BLOCK.min(frames - done);
+            renderer.render(&mut block, count);
+            out[done * 2..(done + count) * 2].copy_from_slice(&block[..count * 2]);
+            done += count;
+        }
+        out
+    };
 
     let mut bytes = Vec::with_capacity(out.len() * 4);
     for sample in &out {
