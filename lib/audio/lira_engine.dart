@@ -91,8 +91,25 @@ class LiraAudioEngine implements AudioEngine {
       );
     }
     _handle = handle;
-    _sampleRate = _engine.sampleRate(handle);
+    final opened = _engine.sampleRate(handle);
     _shared = _engine.transport(handle);
+
+    // The one number the A/B cannot be read without.
+    //
+    // cpal reads the platform session's rate rather than asking for one, so
+    // this is the hardware's rate and not a preference. When it is not what
+    // was asked for, every bundled break and one shot is resampled to it at
+    // load by `AudioClip.resampledTo`, which is linear interpolation and was
+    // only ever meant to run on the odd asset. See docs/M4.md.
+    if (opened != _sampleRate) {
+      debugPrint(
+        'junglengine: Lira engine asked for $_sampleRate Hz and the device '
+        'gave $opened Hz, so every clip is resampled at load',
+      );
+    } else {
+      debugPrint('junglengine: Lira engine open at $opened Hz');
+    }
+    _sampleRate = opened;
   }
 
   @override

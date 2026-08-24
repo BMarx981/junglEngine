@@ -42,11 +42,26 @@ import 'project_store.dart';
 /// for since M0. See docs/M4.md.
 const bool useLiraEngine = bool.fromEnvironment('JE_LIRA_ENGINE');
 
+/// What rate to run the engine at, for the M4 A/B.
+///
+/// Every bundled asset is 44100, so that is the default and it means no
+/// resampling on a device that agrees. A phone that does not agree resamples
+/// somewhere, and *where* is one of the differences between the two engines:
+/// SoLoud converts its output continuously, the Lira engine takes the
+/// hardware's rate and the app resamples each clip once at load.
+///
+/// `--dart-define=JE_SAMPLE_RATE=48000` runs both at the same rate so that
+/// difference stops being one. See docs/M4.md.
+const int engineSampleRate = int.fromEnvironment(
+  'JE_SAMPLE_RATE',
+  defaultValue: 44100,
+);
+
 /// The one engine instance for the app.
 final audioEngineProvider = Provider<AudioEngine>((ref) {
   final AudioEngine engine = useLiraEngine
-      ? LiraAudioEngine()
-      : SoLoudAudioEngine();
+      ? LiraAudioEngine(requestedRate: engineSampleRate)
+      : SoLoudAudioEngine(sampleRate: engineSampleRate);
   ref.onDispose(() => unawaited(engine.shutdown()));
   return engine;
 });

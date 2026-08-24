@@ -121,6 +121,12 @@ class SoLoudAudioEngine implements AudioEngine {
     );
     SoLoud.instance.setGlobalVolume(1);
     _initialized = true;
+    // SoLoud reports the rate it was asked for and not the device's, so unlike
+    // the Lira engine this cannot say whether it is resampling its output. It
+    // is the rate half of the A/B all the same: run both engines at whatever
+    // the Lira one reports the hardware to be and the resampling stops being a
+    // difference between them. See docs/M4.md.
+    debugPrint('junglengine: SoLoud engine initialised at $sampleRate Hz');
   }
 
   @override
