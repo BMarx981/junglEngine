@@ -1,0 +1,24 @@
+[package]
+name = "junglengine_engine"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# The mixer, in Rust. Everything here is what `lib/audio/pattern_renderer.dart`
+# and `lib/audio/sub_voice.dart` already do, ported so that it can run inside
+# an audio callback instead of ahead of one. See docs/M4.md.
+
+[dependencies]
+# The wire format between Dart and the engine is the project's own JSON, the
+# same shape a saved project holds. Specs cross at human speed -- an edit, a
+# card added to a song -- never in the audio callback.
+# serde_json pulls its own core; nothing here derives, so serde itself is not a
+# direct dependency.
+serde_json = "1"
+
+[lib]
+crate-type = ["lib"]
+bench = false
+
+[profile.release]
+lto = "thin"

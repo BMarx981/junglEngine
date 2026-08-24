@@ -52,3 +52,7 @@ app.*.map.json
 
 # Rendered exports left behind by manual testing
 *.wav.tmp
+
+# Rust engine build output. Cargo.lock is committed: the engine is an
+# application, not a library, so its dependency versions want pinning.
+packages/*/rust/target/

@@ -44,6 +44,12 @@ and step timing is sample accurate instead of being at the mercy of Dart timer
 jitter. It also keeps `AudioEngine` narrow enough that the Lira Rust engine can
 replace it at M4 without the grid, the sequencer or the exporter noticing.
 
+That swap has started. `packages/junglengine_engine` holds the mixer and the
+sub synth ported to Rust, proven sample identical to the Dart ones by
+`test/audio/rust_parity_test.dart`, and nothing in the app calls it yet. The
+reason to swap turns out not to be CPU: read `docs/M4.md` before assuming it
+is.
+
 A `RenderSpec` is a list of sections, each one a Beat's turn on the timeline.
 A pattern is one section looping; a song is one section per pass. The sequencer
 never knows which it is playing, which is what makes an arrangement seamless
