@@ -380,6 +380,30 @@ void main() {
       expect(state().song.entries.single.beatId, 'beat-1');
     });
 
+    test('a Beat dropped from the bank lands where it was dropped', () {
+      controller().setView(StudioView.song);
+      controller().addToSong();
+      controller().addBeat(MachineType.chop, 1);
+      controller().addToSong();
+
+      controller().insertIntoSong('beat-2', 0);
+      expect(state().song.entries.map((e) => e.beatId), [
+        'beat-2',
+        'beat-1',
+        'beat-2',
+      ]);
+
+      // Past the end is an append, not a refusal: a drop below the last card
+      // is the commonest one there is.
+      controller().insertIntoSong('beat-1', 99);
+      expect(state().song.entries.last.beatId, 'beat-1');
+      expect(engine.lastSpec!.sections, hasLength(4));
+
+      // A Beat that is not in the project is not a card.
+      controller().insertIntoSong('beat-nope', 0);
+      expect(state().song.length, 4);
+    });
+
     test('deleting a Beat takes its cards with it', () {
       controller().addToSong();
       controller().addBeat(MachineType.kit, 1);
@@ -612,6 +636,124 @@ void main() {
       final sliceCount = state().beat.sliceCount;
       controller().setSliceDivision(32);
       expect(state().beat.sliceCount, sliceCount);
+    });
+  });
+
+  group('queued Beat switch', () {
+    /// Adds a second Beat and goes back to the first, so there is something to
+    /// switch to. Returns the new Beat's id.
+    String secondBeat() {
+      controller().addBeat(MachineType.chop, 1);
+      final id = state().activeBeatId;
+      controller().selectBeat('beat-1');
+      return id;
+    }
+
+    test('stopped, a Beat opens the moment it is chosen', () {
+      final other = secondBeat();
+      controller().selectBeat(other);
+      expect(state().activeBeatId, other);
+      expect(state().pendingBeatId, isNull);
+      expect(engine.lastSpec!.beat.id, other);
+    });
+
+    test(
+      'playing, the Beat waits for the bar and the grid waits with it',
+      () async {
+        final other = secondBeat();
+        await controller().togglePlay();
+        controller().selectBeat(other);
+
+        // Nothing has moved on screen or at the output: the bar is still running.
+        expect(state().pendingBeatId, other);
+        expect(state().activeBeatId, 'beat-1');
+        expect(engine.lastSpec!.beat.id, 'beat-1');
+        expect(engine.queuedSpec!.beat.id, other);
+      },
+    );
+
+    test('the grid follows the bar line, not the tap', () async {
+      final other = secondBeat();
+      await controller().togglePlay();
+      controller().selectBeat(other);
+      engine.landQueuedSpec();
+
+      expect(state().activeBeatId, other);
+      expect(state().pendingBeatId, isNull);
+      expect(state().activeBar, 0);
+    });
+
+    test('tapping the waiting Beat again calls the switch off', () async {
+      final other = secondBeat();
+      await controller().togglePlay();
+      controller().selectBeat(other);
+      controller().selectBeat(other);
+
+      expect(state().pendingBeatId, isNull);
+      expect(state().activeBeatId, 'beat-1');
+      expect(engine.queuedSpec, isNull);
+      expect(engine.cancelledQueues, 1);
+    });
+
+    test('an edit while a Beat waits re-describes what is waiting', () async {
+      final other = secondBeat();
+      await controller().togglePlay();
+      controller().selectBeat(other);
+      controller().setBpm(174);
+
+      // The tempo drag has to reach the Beat that is about to take over, or the
+      // switch would land at the old tempo.
+      expect(engine.queuedSpec!.beat.id, other);
+      expect(engine.queuedSpec!.bpm, 174);
+      expect(engine.lastSpec!.bpm, 174);
+    });
+
+    test('stopping opens the Beat that was waiting', () async {
+      final other = secondBeat();
+      await controller().togglePlay();
+      controller().selectBeat(other);
+      await controller().togglePlay();
+
+      expect(state().activeBeatId, other);
+      expect(state().pendingBeatId, isNull);
+      expect(engine.lastSpec!.beat.id, other);
+    });
+
+    test(
+      'the Song view switches Beats immediately: the song is what plays',
+      () async {
+        final other = secondBeat();
+        controller().addToSong('beat-1');
+        controller().setView(StudioView.song);
+        await controller().togglePlay();
+        controller().selectBeat(other);
+
+        expect(state().activeBeatId, other);
+        expect(state().pendingBeatId, isNull);
+        expect(engine.queuedSpec, isNull);
+      },
+    );
+
+    test('making a Beat calls off anything that was waiting', () async {
+      final other = secondBeat();
+      await controller().togglePlay();
+      controller().selectBeat(other);
+      controller().addBeat(MachineType.kit, 1);
+
+      expect(state().pendingBeatId, isNull);
+      expect(state().activeBeatId, engine.lastSpec!.beat.id);
+      expect(engine.queuedSpec, isNull);
+    });
+
+    test('deleting the Beat that was waiting calls the switch off', () async {
+      final other = secondBeat();
+      await controller().togglePlay();
+      controller().selectBeat(other);
+      controller().deleteBeat(other);
+
+      expect(state().pendingBeatId, isNull);
+      expect(state().activeBeatId, 'beat-1');
+      expect(engine.queuedSpec, isNull);
     });
   });
 

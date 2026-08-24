@@ -90,6 +90,7 @@ class StudioState {
     this.exporting = false,
     this.activeBar = 0,
     this.view = StudioView.pattern,
+    this.pendingBeatId,
   });
 
   final Project project;
@@ -107,6 +108,15 @@ class StudioState {
 
   /// Which Beat in the bank is open.
   final String activeBeatId;
+
+  /// A Beat that has been chosen while the transport is running and is waiting
+  /// for the bar to end, or null when nothing is waiting.
+  ///
+  /// Switching Beats mid bar chops the bar in half, so with the transport
+  /// running the choice is queued and the audio layer lands it on the bar line.
+  /// [activeBeatId] only moves once the new Beat is actually sounding, so the
+  /// grid on screen is always the grid you can hear.
+  final String? pendingBeatId;
 
   /// Which bar of that Beat the grid is showing. A Beat can be eight bars long
   /// and a phone can show one of them at a thumb friendly size, so the grid is
@@ -162,6 +172,8 @@ class StudioState {
     StudioView? view,
     BreakRef? breakRef,
     KitRef? kitRef,
+    String? pendingBeatId,
+    bool clearPending = false,
   }) => StudioState(
     project: project ?? this.project,
     breakRef: breakRef ?? this.breakRef,
@@ -178,6 +190,7 @@ class StudioState {
     exportMode: exportMode ?? this.exportMode,
     exporting: exporting ?? this.exporting,
     view: view ?? this.view,
+    pendingBeatId: clearPending ? null : (pendingBeatId ?? this.pendingBeatId),
   );
 }
 
@@ -229,7 +242,12 @@ class StudioController extends Notifier<StudioState> {
     final breakRef = BreakLibrary.defaultBreak;
     final kitRef = KitLibrary.defaultKit;
     final project = _newProject(breakRef, kitRef);
+    // A queued Beat switch lands when the audio layer says it has, not when the
+    // controller asked for it. See [_onTransport].
+    final transport = _engine.transport;
+    transport.addListener(_onTransport);
     ref.onDispose(() {
+      transport.removeListener(_onTransport);
       _saveTimer?.cancel();
       _saveTimer = null;
     });
@@ -425,6 +443,16 @@ class StudioController extends Notifier<StudioState> {
     final spec = _specFor(state);
     if (spec == null) return;
     unawaited(_engine.setSpec(spec));
+    // A Beat waiting for the bar line was described before this change, so it
+    // gets described again: a tempo drag or an edit landing mid queue must not
+    // be what the switch takes over with.
+    final pending = state.pendingBeatId;
+    if (pending != null) {
+      final queued = _specFor(state.copyWith(activeBeatId: pending));
+      if (queued != null) {
+        unawaited(_engine.setSpec(queued, when: SpecChange.nextBar));
+      }
+    }
     _scheduleSave();
   }
 
@@ -454,18 +482,53 @@ class StudioController extends Notifier<StudioState> {
 
   // --- Beat bank -----------------------------------------------------------
 
+  /// Opens a Beat from the bank.
+  ///
+  /// Stopped, that is immediate. Playing, it is a musical move rather than a
+  /// navigation one: the Beat is queued and takes over when the bar ends, so
+  /// choosing another Beat never chops the bar in half. Tapping the Beat that
+  /// is waiting, or the one already playing, calls the switch off.
   void selectBeat(String beatId) {
-    if (beatId == state.activeBeatId) return;
+    if (beatId == state.activeBeatId || beatId == state.pendingBeatId) {
+      _cancelPending();
+      return;
+    }
+    if (state.project.beatById(beatId) == null) return;
+
+    if (_queuesSwitch) {
+      final queued = _specFor(state.copyWith(activeBeatId: beatId));
+      if (queued != null) {
+        state = state.copyWith(pendingBeatId: beatId);
+        unawaited(_engine.setSpec(queued, when: SpecChange.nextBar));
+        return;
+      }
+    }
+    _openBeat(beatId, sync: true);
+  }
+
+  /// Whether a Beat switch has to wait for the bar to end.
+  ///
+  /// Only when what is playing is the open Beat itself. In the Song view the
+  /// arrangement decides what sounds, so opening a Beat there changes the grid
+  /// and nothing else, and there is nothing to wait for.
+  bool get _queuesSwitch => _engine.transport.value.playing && !state.playsSong;
+
+  /// Puts [beatId] on screen, and points the engine at it when [sync] is set.
+  void _openBeat(String beatId, {required bool sync}) {
     final beat = state.project.beatById(beatId);
-    if (beat == null) return;
+    if (beat == null) {
+      state = state.copyWith(clearPending: true);
+      return;
+    }
     state = state.copyWith(
       activeBeatId: beatId,
       // Bar 1 of whatever you just opened. Beats differ in length, so any
       // carried over page number would land somewhere arbitrary.
       activeBar: 0,
       analysis: _analysisFor(beat),
+      clearPending: true,
     );
-    _syncEngine();
+    if (sync) _syncEngine();
     // Which machine gets lived in, as opposed to which gets made once.
     unawaited(
       _telemetry.log(
@@ -475,9 +538,37 @@ class StudioController extends Notifier<StudioState> {
     );
   }
 
+  /// Calls off a queued switch, on screen and in the audio layer.
+  void _cancelPending() {
+    if (state.pendingBeatId == null) return;
+    state = state.copyWith(clearPending: true);
+    unawaited(_engine.cancelQueuedSpec());
+  }
+
+  /// Lands a queued Beat switch.
+  ///
+  /// The audio layer owns when the swap happens, so the screen follows what is
+  /// sounding rather than the other way round: the grid changes on the bar
+  /// line, at the moment the new Beat becomes audible, not when it was tapped.
+  void _onTransport() {
+    final pending = state.pendingBeatId;
+    if (pending == null) return;
+    final transport = _engine.transport.value;
+    // Stopping is an answer too: there is no bar left to wait for, so the Beat
+    // that was chosen simply opens.
+    if (!transport.playing) {
+      _openBeat(pending, sync: true);
+      return;
+    }
+    if (transport.beatId == pending) _openBeat(pending, sync: false);
+  }
+
   /// Creates a Beat and opens it. Machine type and length are chosen here and
   /// never change afterwards.
   void addBeat(MachineType machineType, int bars) {
+    // Making a Beat is an edit, not a switch: it opens straight away, and any
+    // Beat that was waiting for the bar line stops waiting.
+    _cancelPending();
     final project = state.project;
     final beat = _newBeat(
       id: project.nextBeatId(),
@@ -504,6 +595,7 @@ class StudioController extends Notifier<StudioState> {
   /// Copy and tweak, which is the whole point of the bank. The duplicate lands
   /// next to its original and opens straight away.
   void duplicateActiveBeat() {
+    _cancelPending();
     final project = state.project;
     final source = state.beat;
     final copy = source.duplicate(
@@ -523,6 +615,8 @@ class StudioController extends Notifier<StudioState> {
   void deleteBeat(String beatId) {
     final project = state.project;
     if (project.beats.length <= 1) return;
+    // Nothing to switch to any more.
+    if (beatId == state.pendingBeatId) _cancelPending();
     final index = project.indexOfBeat(beatId);
     if (index < 0) return;
 
@@ -555,14 +649,24 @@ class StudioController extends Notifier<StudioState> {
   /// the same one.
   void setView(StudioView view) {
     if (view == state.view) return;
+    // The timeline is being replaced wholesale, so a Beat waiting for a bar
+    // line on the old one has nothing left to wait for.
+    _cancelPending();
     state = state.copyWith(view: view);
     _syncEngine();
   }
 
   /// Opens a Beat from the Song view. The card you tapped is the pattern you
   /// get, which is the only navigation this app has.
+  ///
+  /// Immediate, unlike tapping a chip on the grid: the view change is already
+  /// swapping one timeline for another, so there is no bar to protect.
   void openBeatFromSong(String beatId) {
-    selectBeat(beatId);
+    _cancelPending();
+    // The view change pushes the new spec itself, so opening the Beat only has
+    // to do it when the view is not moving.
+    final movingView = state.view != StudioView.pattern;
+    if (beatId != state.activeBeatId) _openBeat(beatId, sync: !movingView);
     setView(StudioView.pattern);
   }
 
@@ -574,6 +678,19 @@ class StudioController extends Notifier<StudioState> {
     state = state.copyWith(
       project: state.project.withSong(
         state.project.song.withEntry(SongEntry(beatId: id)),
+      ),
+    );
+    _syncEngine();
+  }
+
+  /// Drops a Beat from the bank into the arrangement at [index]. Same thing
+  /// [addToSong] does, except the arrangement decides where it lands rather
+  /// than the end of the list.
+  void insertIntoSong(String beatId, int index) {
+    if (state.project.beatById(beatId) == null) return;
+    state = state.copyWith(
+      project: state.project.withSong(
+        state.project.song.withEntryAt(SongEntry(beatId: beatId), index),
       ),
     );
     _syncEngine();
@@ -707,6 +824,9 @@ class StudioController extends Notifier<StudioState> {
       state = state.copyWith(canUndo: _undoStack.isNotEmpty);
       return;
     }
+    // An undo that jumps to another Beat is a switch of its own, and it has to
+    // show its work now rather than at the bar line.
+    if (previous.beatId != state.activeBeatId) _cancelPending();
     state = state.copyWith(
       project: state.project.withBeat(previous.beat),
       // Undoing something you did on another Beat has to show you that Beat,

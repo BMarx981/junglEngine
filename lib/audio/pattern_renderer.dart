@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import '../models/beat.dart';
 import '../models/chop_pattern.dart';
 import '../models/kit_pattern.dart';
+import '../models/steps.dart';
 import 'audio_clip.dart';
 import 'sub_voice.dart';
 
@@ -112,6 +113,125 @@ class RenderPosition {
   final double position;
 }
 
+/// Where every step of one [RenderSpec] starts, in frames.
+///
+/// Immutable, and rebuilt rather than edited whenever the tempo, the swing or
+/// the section list moves. That matters because blocks are rendered ahead of
+/// what is audible: whatever pushes them keeps the timeline each block was
+/// rendered against, so a block still resolves to the right position after the
+/// sequencer has moved on to another timeline. See [PatternRenderer.queueSpec].
+class RenderTimeline {
+  factory RenderTimeline(RenderSpec spec) {
+    final fps = spec.sampleRate * 60.0 / spec.bpm / 4.0;
+    final boundaries = <int>[];
+    final sectionOfStep = <int>[];
+    final sectionStartStep = <int>[];
+    var frame = 0.0;
+
+    for (var section = 0; section < spec.sections.length; section++) {
+      final beat = spec.sections[section].beat;
+      sectionStartStep.add(sectionOfStep.length);
+      // Swing pushes the odd sixteenths late and leaves the even ones where
+      // they were, so the bar still starts and ends where it should however
+      // hard the pattern is shuffled.
+      final offset = beat.swingOffsetFraction * fps;
+      for (var local = 0; local < beat.stepCount; local++) {
+        boundaries.add(
+          (frame + local * fps + (local.isOdd ? offset : 0)).round(),
+        );
+        sectionOfStep.add(section);
+      }
+      frame += beat.stepCount * fps;
+    }
+    boundaries.add(frame.round());
+
+    return RenderTimeline._(
+      spec,
+      boundaries,
+      sectionOfStep,
+      sectionStartStep,
+      fps,
+    );
+  }
+
+  const RenderTimeline._(
+    this.spec,
+    this._boundaries,
+    this._sectionOfStep,
+    this._sectionStartStep,
+    this.framesPerStep,
+  );
+
+  final RenderSpec spec;
+
+  /// Frame each step starts on, plus one past the end. Rounded from an exact
+  /// running position, so rounding cannot accumulate into drift.
+  final List<int> _boundaries;
+
+  /// Which section each step belongs to.
+  final List<int> _sectionOfStep;
+
+  /// First step of each section.
+  final List<int> _sectionStartStep;
+
+  /// How many frames one step lasts at this tempo, before swing.
+  final double framesPerStep;
+
+  /// Steps in the whole timeline: one bar for a one bar pattern, the entire
+  /// arrangement in song mode.
+  int get stepCount => _sectionOfStep.length;
+
+  /// Frames in one pass of the timeline.
+  int get loopFrames => _boundaries.last;
+
+  int startFrameOf(int step) => _boundaries[step];
+
+  int stepLength(int step) => _boundaries[step + 1] - _boundaries[step];
+
+  int sectionOf(int step) => _sectionOfStep[step];
+
+  int sectionStart(int section) => _sectionStartStep[section];
+
+  Beat beatAt(int step) => spec.sections[_sectionOfStep[step]].beat;
+
+  /// Whether [step] is the first step of a bar. Every Beat is a whole number of
+  /// bars, so this is also true of the top of the timeline.
+  bool isBarLine(int step) => step % stepsPerBar == 0;
+
+  /// Resolves a frame of the timeline to something the UI can draw.
+  RenderPosition positionAt(int frame) {
+    final total = loopFrames;
+    final wrapped = total <= 0 ? 0 : frame % total;
+    final step = stepAtFrame(wrapped);
+    final section = _sectionOfStep[step];
+    final start = _sectionStartStep[section];
+    final beat = spec.sections[section].beat;
+    final passStart = _boundaries[start];
+    final passFrames = _boundaries[start + beat.stepCount] - passStart;
+    return RenderPosition(
+      step: step - start,
+      stepCount: beat.stepCount,
+      beatId: beat.id,
+      entryIndex: spec.sections[section].entryIndex,
+      position: passFrames <= 0 ? 0 : (wrapped - passStart) / passFrames,
+    );
+  }
+
+  int stepAtFrame(int frame) {
+    var low = 0;
+    var high = stepCount - 1;
+    while (low < high) {
+      final mid = (low + high + 1) >> 1;
+      if (_boundaries[mid] <= frame) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return low;
+  }
+}
+
 /// Turns [RenderSpec] sections into interleaved stereo float samples.
 ///
 /// This is the only thing in the app that makes sound. Live playback pulls
@@ -145,13 +265,58 @@ class PatternRenderer {
     if (next.sampleRate != _spec.sampleRate) return false;
     if (!identical(next.breakClip, _spec.breakClip)) return false;
     if (next.sections.isEmpty) return false;
-    final section = _sectionOfStep[_stepIndex];
+    final section = _timeline.sectionOf(_stepIndex);
     if (section >= next.sections.length) return false;
     final playing = _spec.sections[section].beat;
     final replacement = next.sections[section].beat;
     return playing.id == replacement.id &&
         playing.stepCount == replacement.stepCount &&
         playing.machineType == replacement.machineType;
+  }
+
+  /// Whether [next] could be queued to take over at a bar line.
+  ///
+  /// Much narrower than what [canAdopt] asks, because nothing has to survive a
+  /// queued swap except the material the ringing voices are reading from: the
+  /// pattern is allowed to change completely, that is the point of it.
+  bool canQueue(RenderSpec next) =>
+      next.sampleRate == _spec.sampleRate &&
+      identical(next.breakClip, _spec.breakClip) &&
+      next.sections.isNotEmpty;
+
+  /// Lines [next] up to take over at the end of the bar being rendered.
+  ///
+  /// This is how a Beat is changed under a running transport: the swap lands on
+  /// the bar line rather than the instant it was asked for, so choosing another
+  /// Beat mid bar never chops the bar in half. It is deliberately not
+  /// [updateSpec]'s job, which is the opposite promise: an edit is heard as
+  /// soon as possible and never moves the playhead.
+  void queueSpec(RenderSpec next) {
+    assert(
+      canQueue(next),
+      'queued spec must read the same clip at the same rate',
+    );
+    _queued = next;
+  }
+
+  /// Drops the queued spec, leaving whatever is playing alone.
+  void clearQueuedSpec() => _queued = null;
+
+  bool get hasQueuedSpec => _queued != null;
+
+  /// Takes the queued spec over, at the bar line the render loop has just
+  /// reached.
+  ///
+  /// The playhead goes to the top of the new timeline and every voice is left
+  /// alone, so a slice or a one shot ringing across the join keeps ringing,
+  /// exactly as it does when a song moves from one card to the next.
+  void _adoptQueued() {
+    _spec = _queued!;
+    _queued = null;
+    _buildTimeline();
+    _stepIndex = 0;
+    // -1 rather than 0, so the next fired step installs the new Beat's patch.
+    _sectionIndex = -1;
   }
 
   /// Swaps in edited data without disturbing the playhead or any voice that is
@@ -166,14 +331,14 @@ class PatternRenderer {
       canAdopt(next),
       'updateSpec cannot change what is sounding; build a new renderer instead',
     );
-    final section = _sectionOfStep[_stepIndex];
-    final local = _stepIndex - _sectionStartStep[section];
+    final section = _timeline.sectionOf(_stepIndex);
+    final local = _stepIndex - _timeline.sectionStart(section);
     final previous = _stepLength(_stepIndex);
 
     _spec = next;
     _buildTimeline();
 
-    _stepIndex = _sectionStartStep[section] + local;
+    _stepIndex = _timeline.sectionStart(section) + local;
     final now = _stepLength(_stepIndex);
     if (previous > 0 && now != previous) {
       _framesToNextStep = math.max(
@@ -195,19 +360,12 @@ class PatternRenderer {
   late final int _fadeFrames;
   late final int _attackFrames;
 
-  /// Frame each step starts on, plus one past the end. Built once per tempo or
-  /// swing change: every step boundary in the whole timeline, rounded from an
-  /// exact running position so rounding cannot accumulate into drift, and
-  /// carrying each Beat's swing in the offsets of its odd steps.
-  late List<int> _boundaries;
+  /// Every step boundary of [_spec], rebuilt on any tempo, swing or section
+  /// change.
+  late RenderTimeline _timeline;
 
-  /// Which section each step belongs to.
-  late List<int> _sectionOfStep;
-
-  /// First step of each section.
-  late List<int> _sectionStartStep;
-
-  late double _framesPerStep;
+  /// What takes over at the next bar line, if anything. See [queueSpec].
+  RenderSpec? _queued;
 
   final List<_SliceVoice> _voices = List.generate(
     _maxSliceVoices,
@@ -224,54 +382,31 @@ class PatternRenderer {
   int _sectionIndex = -1;
   bool _tail = false;
 
+  /// The timeline the next block will be rendered against. Whatever pushes
+  /// those blocks holds on to this, because a queued swap can replace it while
+  /// blocks rendered from it are still waiting to be heard.
+  RenderTimeline get timeline => _timeline;
+
   /// Steps in the whole timeline: one bar for a one bar pattern, the entire
   /// arrangement in song mode.
-  int get stepCount => _sectionOfStep.length;
+  int get stepCount => _timeline.stepCount;
 
   /// Frames in one pass of the timeline.
-  int get loopFrames => _boundaries.last;
+  int get loopFrames => _timeline.loopFrames;
 
   /// How many frames one step lasts at the current tempo, before swing.
-  double get framesPerStep => _framesPerStep;
+  double get framesPerStep => _timeline.framesPerStep;
 
   /// Position within the timeline, in frames. Wraps with the loop.
   int get loopFrame =>
-      _boundaries[_stepIndex] + (_stepLength(_stepIndex) - _framesToNextStep);
+      _timeline.startFrameOf(_stepIndex) +
+      (_stepLength(_stepIndex) - _framesToNextStep);
 
-  int _stepLength(int step) => _boundaries[step + 1] - _boundaries[step];
+  int _stepLength(int step) => _timeline.stepLength(step);
 
-  Beat _beatAt(int step) => _spec.sections[_sectionOfStep[step]].beat;
+  Beat _beatAt(int step) => _timeline.beatAt(step);
 
-  void _buildTimeline() {
-    final fps = _spec.sampleRate * 60.0 / _spec.bpm / 4.0;
-    _framesPerStep = fps;
-
-    final boundaries = <int>[];
-    final sectionOfStep = <int>[];
-    final sectionStartStep = <int>[];
-    var frame = 0.0;
-
-    for (var section = 0; section < _spec.sections.length; section++) {
-      final beat = _spec.sections[section].beat;
-      sectionStartStep.add(sectionOfStep.length);
-      // Swing pushes the odd sixteenths late and leaves the even ones where
-      // they were, so the bar still starts and ends where it should however
-      // hard the pattern is shuffled.
-      final offset = beat.swingOffsetFraction * fps;
-      for (var local = 0; local < beat.stepCount; local++) {
-        boundaries.add(
-          (frame + local * fps + (local.isOdd ? offset : 0)).round(),
-        );
-        sectionOfStep.add(section);
-      }
-      frame += beat.stepCount * fps;
-    }
-    boundaries.add(frame.round());
-
-    _boundaries = boundaries;
-    _sectionOfStep = sectionOfStep;
-    _sectionStartStep = sectionStartStep;
-  }
+  void _buildTimeline() => _timeline = RenderTimeline(_spec);
 
   /// Returns to the top of the timeline and clears all voice state, so two
   /// renders from the same spec are sample identical.
@@ -279,6 +414,9 @@ class PatternRenderer {
     _stepIndex = 0;
     _sectionIndex = -1;
     _tail = false;
+    // A rewind is a fresh start, so anything waiting for a bar line that is
+    // never going to arrive goes with it.
+    _queued = null;
     for (final v in _voices) {
       v.active = false;
     }
@@ -307,45 +445,22 @@ class PatternRenderer {
         _framesToNextStep -= chunk;
       }
       if (_framesToNextStep <= 0) {
-        _stepIndex = (_stepIndex + 1) % stepCount;
+        final next = (_stepIndex + 1) % stepCount;
+        // The one place a queued Beat can land: on a bar line, between the last
+        // step of the bar and the first step of the next one.
+        if (_queued != null && _timeline.isBarLine(next)) {
+          _adoptQueued();
+        } else {
+          _stepIndex = next;
+        }
         _framesToNextStep = _stepLength(_stepIndex);
         _fireStep(_stepIndex);
       }
     }
   }
 
-  /// Resolves a frame of the timeline to something the UI can draw.
-  RenderPosition positionAt(int frame) {
-    final total = loopFrames;
-    final wrapped = total <= 0 ? 0 : frame % total;
-    final step = _stepAtFrame(wrapped);
-    final section = _sectionOfStep[step];
-    final start = _sectionStartStep[section];
-    final beat = _spec.sections[section].beat;
-    final passStart = _boundaries[start];
-    final passFrames = _boundaries[start + beat.stepCount] - passStart;
-    return RenderPosition(
-      step: step - start,
-      stepCount: beat.stepCount,
-      beatId: beat.id,
-      entryIndex: _spec.sections[section].entryIndex,
-      position: passFrames <= 0 ? 0 : (wrapped - passStart) / passFrames,
-    );
-  }
-
-  int _stepAtFrame(int frame) {
-    var low = 0;
-    var high = stepCount - 1;
-    while (low < high) {
-      final mid = (low + high + 1) >> 1;
-      if (_boundaries[mid] <= frame) {
-        low = mid;
-      } else {
-        high = mid - 1;
-      }
-    }
-    return low;
-  }
+  /// Resolves a frame of the current timeline to something the UI can draw.
+  RenderPosition positionAt(int frame) => _timeline.positionAt(frame);
 
   void _renderChunk(Float32List out, int atFrame, int count) {
     final clip = _spec.breakClip.samples;
@@ -432,7 +547,7 @@ class PatternRenderer {
 
   void _fireStep(int step) {
     if (_tail) return;
-    final section = _sectionOfStep[step];
+    final section = _timeline.sectionOf(step);
     final beat = _spec.sections[section].beat;
     if (section != _sectionIndex) {
       // A song can run a different patch on the next card, and the patch is
@@ -441,7 +556,7 @@ class PatternRenderer {
       _sectionIndex = section;
       _sub.setPatch(beat.subPatch);
     }
-    final local = step - _sectionStartStep[section];
+    final local = step - _timeline.sectionStart(section);
 
     if (beat.isKit) {
       for (var slot = 0; slot < kitSlotCount; slot++) {

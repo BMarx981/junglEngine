@@ -20,7 +20,7 @@ class _BlockMarker {
   const _BlockMarker({
     required this.pushedFrame,
     required this.loopFrame,
-    required this.loopFrames,
+    required this.timeline,
   });
 
   /// How many frames had been pushed to the device when this block was
@@ -29,7 +29,12 @@ class _BlockMarker {
 
   /// Where the timeline was at the top of the block.
   final int loopFrame;
-  final int loopFrames;
+
+  /// The timeline this block was rendered against, held rather than looked up
+  /// later: a queued Beat swap can replace the renderer's timeline while this
+  /// block is still waiting its turn at the device, and the playhead has to
+  /// keep reporting the Beat that is audible until then.
+  final RenderTimeline timeline;
 }
 
 class SoLoudAudioEngine implements AudioEngine {
@@ -158,10 +163,29 @@ class SoLoudAudioEngine implements AudioEngine {
   }
 
   @override
-  Future<void> setSpec(RenderSpec spec) async {
+  Future<void> setSpec(
+    RenderSpec spec, {
+    SpecChange when = SpecChange.now,
+  }) async {
+    final playing = _transport.value.playing;
+    if (when == SpecChange.nextBar &&
+        playing &&
+        _renderer != null &&
+        _renderer!.canQueue(spec)) {
+      // Nothing is torn down and nothing restarts: the swap happens inside the
+      // render loop, on the bar line, so the bar that is playing finishes.
+      // [_spec] moves now all the same, because auditions and the pad sources
+      // belong to the Beat that is being switched to.
+      _spec = spec;
+      _renderer!.queueSpec(spec);
+      unawaited(_ensureSliceSources());
+      unawaited(_ensureKitSources());
+      return;
+    }
+
     _spec = spec;
 
-    final wasPlaying = _transport.value.playing;
+    final wasPlaying = playing;
     final renderer = _renderer;
     if (renderer == null || !renderer.canAdopt(spec)) {
       // A different Beat, a different machine or a different break: what is
@@ -179,6 +203,18 @@ class SoLoudAudioEngine implements AudioEngine {
     _transport.value = _transport.value.copyWith(
       stepCount: spec.beat.stepCount,
     );
+    unawaited(_ensureSliceSources());
+    unawaited(_ensureKitSources());
+  }
+
+  @override
+  Future<void> cancelQueuedSpec() async {
+    final renderer = _renderer;
+    if (renderer == null || !renderer.hasQueuedSpec) return;
+    renderer.clearQueuedSpec();
+    // The queued spec had already been made current for auditions. What is
+    // actually playing takes that back.
+    _spec = renderer.spec;
     unawaited(_ensureSliceSources());
     unawaited(_ensureKitSources());
   }
@@ -285,12 +321,11 @@ class SoLoudAudioEngine implements AudioEngine {
       _markers.removeFirst();
     }
     if (_markers.isEmpty) return;
-    final renderer = _renderer;
     final marker = _markers.first;
-    if (renderer == null || marker.loopFrames <= 0) return;
+    if (marker.timeline.loopFrames <= 0) return;
 
     final into = consumedFrames - marker.pushedFrame;
-    final at = renderer.positionAt(marker.loopFrame + into);
+    final at = marker.timeline.positionAt(marker.loopFrame + into);
 
     _transport.value = _transport.value.copyWith(
       step: at.step,
@@ -314,7 +349,7 @@ class SoLoudAudioEngine implements AudioEngine {
       _BlockMarker(
         pushedFrame: _framesPushed,
         loopFrame: renderer.loopFrame,
-        loopFrames: renderer.loopFrames,
+        timeline: renderer.timeline,
       ),
     );
     renderer.render(_block, _blockFrames);

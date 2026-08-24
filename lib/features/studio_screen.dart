@@ -64,7 +64,8 @@ class _Studio extends ConsumerWidget {
       children: [
         const TransportBar(),
         // The bank is on screen in both views: on the grid it says what you are
-        // editing, in the Song view it says what the ADD button will add.
+        // editing, in the Song view it is the palette the arrangement is built
+        // from, by the ADD button or by dragging a chip into the list.
         const BeatBar(),
         // The arrangement replaces the grid and the sub lane rather than
         // sitting on top of them: the Song view is about order and repeats, and

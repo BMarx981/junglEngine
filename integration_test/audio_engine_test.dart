@@ -9,6 +9,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:junglengine/audio/engine.dart';
 import 'package:junglengine/audio/pattern_renderer.dart';
 import 'package:junglengine/audio/soloud_engine.dart';
 import 'package:junglengine/features/library/break_library.dart';
@@ -152,6 +153,39 @@ void main() {
       ),
     );
     await Future<void>.delayed(const Duration(milliseconds: 400));
+    expect(engine.transport.value.playing, isTrue);
+
+    await engine.stop();
+  });
+
+  testWidgets('another Beat takes over on the bar line, not on the tap', (
+    tester,
+  ) async {
+    final spec = await loadedSpec();
+    await engine.initialize();
+    await engine.setSpec(spec);
+    await engine.start();
+    // Well inside the first bar, which at 170 BPM runs about 1.4 seconds.
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
+    await engine.setSpec(
+      RenderSpec(
+        breakClip: spec.breakClip,
+        beat: spec.beat.copyWith(id: 'c', name: 'C'),
+        bpm: spec.bpm,
+        sampleRate: spec.sampleRate,
+      ),
+      when: SpecChange.nextBar,
+    );
+
+    // Still the Beat that was playing, still playing it.
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    expect(engine.transport.value.beatId, 'b');
+    expect(engine.transport.value.playing, isTrue);
+
+    // Past the bar line: the other Beat, without the transport stopping.
+    await Future<void>.delayed(const Duration(milliseconds: 1400));
+    expect(engine.transport.value.beatId, 'c');
     expect(engine.transport.value.playing, isTrue);
 
     await engine.stop();

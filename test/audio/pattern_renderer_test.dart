@@ -749,6 +749,150 @@ void main() {
     });
   });
 
+  group('queued Beat switch', () {
+    // One clip for every spec here: a queued swap leaves ringing voices alone,
+    // so it is only offered when both sides read the same material.
+    final clip = testBreak();
+
+    /// A Beat that plays one slice on every step, so any frame of a rendered
+    /// bar says plainly which Beat it came from.
+    Beat everyStep(String id, int slice, {int bars = 1}) {
+      var chop = ChopPattern.empty(bars: bars);
+      for (var step = 0; step < bars * 16; step++) {
+        chop = chop.withStep(step, slice);
+      }
+      return Beat(
+        id: id,
+        name: id,
+        bars: bars,
+        sliceCount: sliceCount,
+        chop: chop,
+        sub: SubLane.empty(),
+      );
+    }
+
+    RenderSpec specOf(Beat beat) => specFor(beat, clip: clip);
+
+    /// Renders in blocks, calling [onBlock] with the frames rendered so far, so
+    /// a switch can be asked for part way through a bar the way the engine's
+    /// push loop asks for one.
+    Float32List runInBlocks(
+      PatternRenderer renderer,
+      int frames, {
+      required void Function(int done) onBlock,
+      int block = 512,
+    }) {
+      final out = Float32List(frames * 2);
+      final scratch = Float32List(block * 2);
+      var done = 0;
+      while (done < frames) {
+        onBlock(done);
+        final n = (frames - done) < block ? frames - done : block;
+        renderer.render(scratch, n);
+        out.setRange(done * 2, (done + n) * 2, scratch);
+        done += n;
+      }
+      return out;
+    }
+
+    /// What a slice reads as once it is through the mixer.
+    double levelOf(int slice) =>
+        PatternRenderer.softClip((slice + 1) / 32.0 * 0.92);
+
+    test('a Beat queued mid bar is not heard until the bar ends', () {
+      final renderer = PatternRenderer(specOf(everyStep('a', 2)));
+      final bar = renderer.loopFrames;
+      final step = renderer.framesPerStep;
+
+      final out = runInBlocks(
+        renderer,
+        bar * 2,
+        onBlock: (done) {
+          // Asked for a third of the way through the first bar.
+          if (done == 512) renderer.queueSpec(specOf(everyStep('b', 9)));
+        },
+      );
+
+      // Mid bar, where the switch was asked for, and again on the last step:
+      // the bar that was playing plays out.
+      expect(out[(step * 8.5).round() * 2], closeTo(levelOf(2), 0.01));
+      expect(out[(step * 15.5).round() * 2], closeTo(levelOf(2), 0.01));
+      // First step of the next bar: the new Beat, from its top.
+      expect(out[(bar + step * 0.5).round() * 2], closeTo(levelOf(9), 0.01));
+      expect(out[(bar + step * 8.5).round() * 2], closeTo(levelOf(9), 0.01));
+    });
+
+    test('the switch lands on the bar, not at the end of a longer Beat', () {
+      final renderer = PatternRenderer(specOf(everyStep('a', 2, bars: 2)));
+      final bar = renderer.loopFrames ~/ 2;
+      final step = renderer.framesPerStep;
+
+      final out = runInBlocks(
+        renderer,
+        bar * 2,
+        onBlock: (done) {
+          if (done == 512) renderer.queueSpec(specOf(everyStep('b', 9)));
+        },
+      );
+
+      // Two bars in the Beat, one measure of waiting: the second bar of it
+      // never plays.
+      expect(out[(bar + step * 0.5).round() * 2], closeTo(levelOf(9), 0.01));
+    });
+
+    test('the swap takes the whole spec over, once', () {
+      final renderer = PatternRenderer(specOf(everyStep('a', 2)));
+      renderer.queueSpec(specOf(everyStep('b', 9)));
+      expect(renderer.hasQueuedSpec, isTrue);
+
+      runInBlocks(renderer, renderer.loopFrames + 1024, onBlock: (_) {});
+
+      expect(renderer.hasQueuedSpec, isFalse);
+      expect(renderer.spec.beat.id, 'b');
+    });
+
+    test('a cancelled queue leaves what is playing alone', () {
+      final renderer = PatternRenderer(specOf(everyStep('a', 2)));
+      final bar = renderer.loopFrames;
+      final step = renderer.framesPerStep;
+
+      final out = runInBlocks(
+        renderer,
+        bar * 2,
+        onBlock: (done) {
+          if (done == 512) renderer.queueSpec(specOf(everyStep('b', 9)));
+          if (done == 1024) renderer.clearQueuedSpec();
+        },
+      );
+
+      expect(out[(bar + step * 8.5).round() * 2], closeTo(levelOf(2), 0.01));
+      expect(renderer.spec.beat.id, 'a');
+    });
+
+    test('a spec reading other material cannot be queued', () {
+      final renderer = PatternRenderer(specOf(everyStep('a', 2)));
+      expect(renderer.canQueue(specOf(everyStep('b', 9))), isTrue);
+      expect(
+        renderer.canQueue(specFor(everyStep('b', 9), clip: testBreak())),
+        isFalse,
+      );
+    });
+
+    test('blocks already rendered still report the Beat they were rendered '
+        'with', () {
+      // The playhead is read back from blocks that are queued at the device, so
+      // the timeline each one was rendered against has to outlive the swap or
+      // the grid changes before the sound does.
+      final renderer = PatternRenderer(specOf(everyStep('a', 2)));
+      final before = renderer.timeline;
+      renderer.queueSpec(specOf(everyStep('b', 9)));
+      runInBlocks(renderer, renderer.loopFrames + 1024, onBlock: (_) {});
+
+      expect(before.positionAt(0).beatId, 'a');
+      expect(renderer.timeline.positionAt(0).beatId, 'b');
+    });
+  });
+
   group('sub accent', () {
     /// How much of the signal is above the fundamental, roughly: the sum of
     /// sample to sample movement. A more open filter passes more harmonics and

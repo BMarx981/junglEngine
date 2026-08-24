@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,11 +19,49 @@ import '../../theme.dart';
 /// nothing is measured in pixels per bar: a card follows the one above it and
 /// plays the number of times its stepper says. Drag a card to move it, tap it
 /// to open that Beat's grid.
-class SongView extends ConsumerWidget {
+///
+/// The list is also a drop target: drag a chip out of the beat bank and the
+/// arrangement opens a gap where it would land. That is the same edit the ADD
+/// button makes, except the finger picks the position instead of it always
+/// being the end.
+class SongView extends ConsumerStatefulWidget {
   const SongView({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SongView> createState() => _SongViewState();
+}
+
+class _SongViewState extends ConsumerState<SongView> {
+  /// A card plus the gap under it. Every card is the same height, so where a
+  /// dropped Beat lands is arithmetic on the pointer rather than a question
+  /// put to every card on screen.
+  static const double _extent = _SongCard.height + _SongCard.gap;
+
+  /// How near an edge the finger has to be before the list starts moving under
+  /// it. Without this, an arrangement longer than the screen could not be
+  /// dropped into at the bottom.
+  static const double _edge = 56;
+  static const double _edgeStep = 8;
+
+  final ScrollController _scroll = ScrollController();
+  final GlobalKey _listKey = GlobalKey();
+
+  /// Where a Beat held over the list would land, or null when nothing is over
+  /// it. This is an index between cards, so it runs to [Song.length].
+  int? _dropIndex;
+  double _pointerY = 0;
+  Timer? _edgeScroll;
+  int _edgeDirection = 0;
+
+  @override
+  void dispose() {
+    _stopEdgeScroll();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(studioProvider);
     final controller = ref.read(studioProvider.notifier);
     final song = state.song;
@@ -31,29 +71,151 @@ class SongView extends ConsumerWidget {
       children: [
         _Header(bars: state.project.songBars, cards: song.length),
         Expanded(
-          child: song.isEmpty
-              ? const _Empty()
-              : ReorderableListView.builder(
-                  buildDefaultDragHandles: false,
-                  padding: const EdgeInsets.only(bottom: 8),
-                  itemCount: song.length,
-                  onReorderItem: (from, to) {
-                    HapticFeedback.selectionClick();
-                    controller.moveSongEntry(from, to);
-                  },
-                  itemBuilder: (context, index) {
-                    final entry = song.entries[index];
-                    return _SongCard(
-                      key: ValueKey('${index}_${entry.beatId}'),
-                      index: index,
-                      entry: entry,
-                      beat: state.project.beatForEntry(entry),
-                      transport: ref.watch(transportProvider),
-                    );
-                  },
+          child: DragTarget<String>(
+            // A chip carries a Beat id. A Beat deleted mid drag is not a drop
+            // this list can honour, so it is refused rather than inserted as a
+            // card that cannot draw itself.
+            onWillAcceptWithDetails: (details) =>
+                state.project.beatById(details.data) != null,
+            onMove: (details) => _pointerMoved(details.offset),
+            onLeave: (_) => _clearDrop(),
+            onAcceptWithDetails: (details) {
+              final index = _dropIndex ?? song.length;
+              _clearDrop();
+              HapticFeedback.mediumImpact();
+              controller.insertIntoSong(details.data, index);
+            },
+            builder: (context, candidate, rejected) => Stack(
+              key: _listKey,
+              children: [
+                Positioned.fill(
+                  child: song.isEmpty
+                      ? _Empty(open: _dropIndex != null)
+                      : ReorderableListView.builder(
+                          buildDefaultDragHandles: false,
+                          scrollController: _scroll,
+                          padding: const EdgeInsets.only(bottom: 8),
+                          itemCount: song.length,
+                          onReorderItem: (from, to) {
+                            HapticFeedback.selectionClick();
+                            controller.moveSongEntry(from, to);
+                          },
+                          itemBuilder: (context, index) {
+                            final entry = song.entries[index];
+                            return _SongCard(
+                              key: ValueKey('${index}_${entry.beatId}'),
+                              index: index,
+                              entry: entry,
+                              beat: state.project.beatForEntry(entry),
+                              transport: ref.watch(transportProvider),
+                            );
+                          },
+                        ),
                 ),
+                if (_dropIndex != null && song.isNotEmpty) _dropLine(),
+              ],
+            ),
+          ),
         ),
       ],
+    );
+  }
+
+  /// The line drawn in the gap the dropped Beat would take. It sits in the
+  /// list's own coordinates, so it has to be moved back by the scroll offset.
+  Widget _dropLine() {
+    final offset = _scroll.hasClients ? _scroll.offset : 0.0;
+    final height = _listHeight();
+    final top = (_dropIndex! * _extent - offset - _SongCard.gap / 2 - 1).clamp(
+      0.0,
+      height > 2 ? height - 2 : 0.0,
+    );
+    return Positioned(left: 0, right: 0, top: top, child: const _DropLine());
+  }
+
+  double _listHeight() {
+    final box = _listKey.currentContext?.findRenderObject() as RenderBox?;
+    return box?.size.height ?? 0;
+  }
+
+  void _pointerMoved(Offset globalPosition) {
+    final box = _listKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    _pointerY = box.globalToLocal(globalPosition).dy;
+    final index = _indexAt(_pointerY);
+    if (index != _dropIndex) {
+      // Every gap the finger crosses ticks, which is what makes a blind drop
+      // land where it was meant to.
+      HapticFeedback.selectionClick();
+      setState(() => _dropIndex = index);
+    }
+    _runEdgeScroll(box.size.height);
+  }
+
+  int _indexAt(double y) {
+    final offset = _scroll.hasClients ? _scroll.offset : 0.0;
+    final count = ref.read(studioProvider).song.length;
+    // Rounding rather than truncating puts the boundary at a card's middle:
+    // the top half of a card means before it, the bottom half after it.
+    return ((offset + y) / _extent).round().clamp(0, count);
+  }
+
+  void _runEdgeScroll(double height) {
+    final direction = _pointerY < _edge
+        ? -1
+        : (_pointerY > height - _edge ? 1 : 0);
+    if (direction == _edgeDirection) return;
+    _stopEdgeScroll();
+    _edgeDirection = direction;
+    if (direction == 0 || !_scroll.hasClients) return;
+    _edgeScroll = Timer.periodic(const Duration(milliseconds: 16), (_) {
+      if (!_scroll.hasClients) {
+        _stopEdgeScroll();
+        return;
+      }
+      final position = _scroll.position;
+      final target = (position.pixels + direction * _edgeStep).clamp(
+        0.0,
+        position.maxScrollExtent,
+      );
+      if (target == position.pixels) return;
+      _scroll.jumpTo(target);
+      // The finger has not moved but the cards have, so the gap it is over is
+      // a different one.
+      setState(() => _dropIndex = _indexAt(_pointerY));
+    });
+  }
+
+  void _stopEdgeScroll() {
+    _edgeScroll?.cancel();
+    _edgeScroll = null;
+    _edgeDirection = 0;
+  }
+
+  void _clearDrop() {
+    _stopEdgeScroll();
+    if (_dropIndex == null) return;
+    setState(() => _dropIndex = null);
+  }
+}
+
+/// Where the Beat lands if the finger lets go now.
+class _DropLine extends StatelessWidget {
+  const _DropLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 2),
+      child: SizedBox(
+        height: 2,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: JungleTheme.accent,
+            borderRadius: BorderRadius.all(Radius.circular(1)),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -91,17 +253,30 @@ class _Header extends StatelessWidget {
 }
 
 class _Empty extends StatelessWidget {
-  const _Empty();
+  const _Empty({this.open = false});
+
+  /// True while a Beat is held over the empty list. There is no gap to point
+  /// at yet, so the whole area answers instead.
+  final bool open;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 30),
-        child: Text(
-          context.l10n.songEmpty,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelSmall,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: open ? JungleTheme.surface : null,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(
+          color: open ? JungleTheme.accent : Colors.transparent,
+        ),
+      ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 30),
+          child: Text(
+            context.l10n.songEmpty,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
         ),
       ),
     );
@@ -129,6 +304,11 @@ class _SongCard extends ConsumerWidget {
 
   final ValueListenable<TransportState> transport;
 
+  /// Fixed, and the Song view depends on it staying fixed: a drop position is
+  /// worked out from these two numbers rather than from the cards themselves.
+  static const double height = 52;
+  static const double gap = 6;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(studioProvider.notifier);
@@ -136,7 +316,7 @@ class _SongCard extends ConsumerWidget {
     final bars = (beat?.bars ?? 0) * entry.repeats;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: _SongCard.gap),
       child: ValueListenableBuilder(
         valueListenable: transport,
         builder: (context, state, child) {
@@ -159,7 +339,7 @@ class _SongCard extends ConsumerWidget {
         child: Directionality(
           textDirection: TextDirection.ltr,
           child: SizedBox(
-            height: 52,
+            height: _SongCard.height,
             child: Row(
               children: [
                 ReorderableDragStartListener(

@@ -264,6 +264,49 @@ void main() {
     expect(find.textContaining('2 bars at 170 BPM'), findsOneWidget);
   });
 
+  testWidgets('a Beat chosen while playing blinks until the bar ends', (
+    tester,
+  ) async {
+    /// The chip's own container: the nearest one around its name.
+    BoxDecoration chipBox(String name) =>
+        tester
+                .widget<Container>(
+                  find
+                      .ancestor(
+                        of: inBeatBar(name),
+                        matching: find.byType(Container),
+                      )
+                      .first,
+                )
+                .decoration!
+            as BoxDecoration;
+
+    final engine = await pumpStudio(tester);
+    await tester.tap(inBeatBar(l10n.beatBarDup));
+    await tester.pump();
+    await tester.tap(find.byIcon(Icons.play_arrow));
+    await tester.pump();
+
+    await tester.tap(inBeatBar('A'));
+    await tester.pump();
+    // Part way into the blink, which only runs while a Beat is waiting.
+    await tester.pump(const Duration(milliseconds: 190));
+
+    // B is still the Beat being played and drawn; A is only waiting for it.
+    expect(chipBox('B').color, JungleTheme.accent);
+    expect(chipBox('A').color, JungleTheme.surfaceHigh);
+    expect(chipBox('A').border!.top.color, isNot(JungleTheme.line));
+    expect(engine.lastSpec!.beat.name, 'B');
+    expect(engine.queuedSpec!.beat.name, 'A');
+
+    // The bar ends and the grid goes with it.
+    engine.landQueuedSpec();
+    await tester.pump();
+
+    expect(chipBox('A').color, JungleTheme.accent);
+    expect(chipBox('B').color, JungleTheme.surfaceHigh);
+  });
+
   testWidgets('the beat bank opens with one Beat and a way to make more', (
     tester,
   ) async {
@@ -512,6 +555,39 @@ void main() {
     await tester.pump();
 
     expect(engine.lastSpec!.sections.single.beat.name, 'A');
+  });
+
+  testWidgets('a bank chip drags into the arrangement', (tester) async {
+    final engine = await pumpStudio(tester);
+
+    await tester.tap(inBeatBar(l10n.beatBarDup));
+    await tester.pump();
+    await tester.tap(inBeatBar('SONG'));
+    await tester.pumpAndSettle();
+    await tester.tap(inActionBar(l10n.actionAddBeat(iso('B'))));
+    await tester.pump();
+
+    final card = find.descendant(
+      of: find.byType(SongView),
+      matching: find.text('B'),
+    );
+
+    // Straight down out of the bank, because sideways is the bank scrolling.
+    final gesture = await tester.startGesture(tester.getCenter(inBeatBar('A')));
+    await tester.pump(const Duration(milliseconds: 20));
+    await gesture.moveBy(const Offset(0, 40));
+    await tester.pump();
+    // Above the middle of the only card, which means in front of it.
+    await gesture.moveTo(tester.getCenter(card) - const Offset(0, 18));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(engine.lastSpec!.sections.map((s) => s.beat.name).toList(), [
+      'A',
+      'B',
+    ]);
+    expect(find.text('2 CARDS   2 BARS'), findsOneWidget);
   });
 
   testWidgets('the library sheet switches the project break', (tester) async {

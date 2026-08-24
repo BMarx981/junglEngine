@@ -24,6 +24,10 @@ class FakeAudioEngine implements AudioEngine {
   ValueListenable<TransportState> get transport => _transport;
 
   RenderSpec? lastSpec;
+
+  /// What is waiting for a bar line, if anything. See [landQueuedSpec].
+  RenderSpec? queuedSpec;
+  int cancelledQueues = 0;
   final List<int> auditioned = [];
   final List<int> auditionedSlots = [];
   final List<AudioClip> auditionedClips = [];
@@ -42,17 +46,49 @@ class FakeAudioEngine implements AudioEngine {
   }
 
   @override
-  Future<void> setSpec(RenderSpec spec) async {
+  Future<void> setSpec(
+    RenderSpec spec, {
+    SpecChange when = SpecChange.now,
+  }) async {
+    if (when == SpecChange.nextBar && _transport.value.playing) {
+      queuedSpec = spec;
+      return;
+    }
     lastSpec = spec;
     _transport.value = _transport.value.copyWith(
       stepCount: spec.beat.stepCount,
+      beatId: spec.beat.id,
+    );
+  }
+
+  @override
+  Future<void> cancelQueuedSpec() async {
+    if (queuedSpec == null) return;
+    queuedSpec = null;
+    cancelledQueues++;
+  }
+
+  /// Runs the queued spec into the bar line, which is what the real engine does
+  /// inside its render loop.
+  void landQueuedSpec() {
+    final spec = queuedSpec;
+    if (spec == null) return;
+    queuedSpec = null;
+    lastSpec = spec;
+    _transport.value = _transport.value.copyWith(
+      step: 0,
+      stepCount: spec.beat.stepCount,
+      beatId: spec.beat.id,
     );
   }
 
   @override
   Future<void> start() async {
     startCount++;
-    _transport.value = _transport.value.copyWith(playing: true);
+    _transport.value = _transport.value.copyWith(
+      playing: true,
+      beatId: lastSpec?.beat.id ?? '',
+    );
   }
 
   @override

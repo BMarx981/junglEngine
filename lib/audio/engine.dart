@@ -66,6 +66,19 @@ class TransportState {
       Object.hash(playing, step, stepCount, loopPosition, beatId, entryIndex);
 }
 
+/// When a new [RenderSpec] takes over.
+enum SpecChange {
+  /// As soon as the engine can, without interrupting anything that is ringing.
+  /// What every edit wants: paint a step and hear it on the next pass.
+  now,
+
+  /// At the end of the bar being played. Changing which Beat is playing is a
+  /// musical move rather than an edit, so it waits for the bar rather than
+  /// chopping it in half. Falls back to [now] with the transport stopped,
+  /// because then there is no bar to wait for.
+  nextBar,
+}
+
 /// The boundary between the app and whatever is making noise.
 ///
 /// M0 is backed by flutter_soloud. The Lira Rust engine is meant to drop in
@@ -86,8 +99,12 @@ abstract class AudioEngine {
 
   /// Installs what should be playing. Safe to call while the transport is
   /// running: the change takes effect at the next block boundary without
-  /// interrupting the loop.
-  Future<void> setSpec(RenderSpec spec);
+  /// interrupting the loop, or at the end of the bar when [when] says so.
+  Future<void> setSpec(RenderSpec spec, {SpecChange when = SpecChange.now});
+
+  /// Drops whatever [SpecChange.nextBar] queued and leaves what is playing
+  /// alone. Does nothing when nothing is queued.
+  Future<void> cancelQueuedSpec();
 
   Future<void> start();
 

@@ -17,6 +17,10 @@ import 'new_beat_sheet.dart';
 /// This is the bank, not the Song: it is every Beat that exists, in the order
 /// they were made. The button on the left is the way over to the arrangement,
 /// which is where order and repeats are decided.
+///
+/// In the Song view the chips are also the arrangement's palette: drag one
+/// down into the list to drop it between two cards, or tap it and let the ADD
+/// button put it on the end.
 class BeatBar extends ConsumerWidget {
   const BeatBar({super.key});
 
@@ -37,7 +41,8 @@ class BeatBar extends ConsumerWidget {
         children: [
           // The way between the grid and the arrangement, and back. It sits
           // next to the chips because the bank is the palette for both: in the
-          // Song view, tapping a chip is choosing what the ADD button adds.
+          // Song view, a chip is both what the ADD button adds and something
+          // you can drag straight into the arrangement.
           _BankButton(
             icon: state.inSong ? Icons.grid_on : Icons.queue_music,
             label: state.inSong
@@ -59,6 +64,13 @@ class BeatBar extends ConsumerWidget {
                   _BeatChip(
                     beat: beat,
                     selected: beat.id == state.activeBeatId,
+                    // Chosen, but the bar it is waiting for has not ended yet.
+                    // It blinks rather than saying so in words: this is a chip
+                    // the width of two letters in twelve languages.
+                    pending: beat.id == state.pendingBeatId,
+                    // Only in the Song view is there anywhere to drop one. On
+                    // the grid the chips are a selector and nothing else.
+                    draggable: state.inSong,
                     onTap: () {
                       HapticFeedback.selectionClick();
                       controller.selectBeat(beat.id);
@@ -148,67 +160,152 @@ class BeatBar extends ConsumerWidget {
   }
 }
 
-class _BeatChip extends StatelessWidget {
+class _BeatChip extends StatefulWidget {
   const _BeatChip({
     required this.beat,
     required this.selected,
+    required this.pending,
+    required this.draggable,
     required this.onTap,
     required this.onHold,
   });
 
   final Beat beat;
   final bool selected;
+
+  /// Whether this Beat has been chosen and is waiting for the bar to end. See
+  /// [StudioState.pendingBeatId].
+  final bool pending;
+
+  /// Whether the chip can be carried out of the bank and dropped into the
+  /// arrangement. See [BeatBar].
+  final bool draggable;
+
   final VoidCallback onTap;
   final VoidCallback? onHold;
 
   @override
+  State<_BeatChip> createState() => _BeatChipState();
+}
+
+class _BeatChipState extends State<_BeatChip>
+    with SingleTickerProviderStateMixin {
+  /// The blink of a Beat that is waiting for the bar line. Runs only while
+  /// something is waiting, which is never longer than a bar.
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    // Built here rather than lazily: a chip that never blinked would otherwise
+    // build one on the way out, from dispose, where there is no ticker to have.
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+    );
+    if (widget.pending) _pulse.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(_BeatChip old) {
+    super.didUpdateWidget(old);
+    if (widget.pending == old.pending) return;
+    if (widget.pending) {
+      _pulse.repeat(reverse: true);
+    } else {
+      _pulse
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final foreground = selected ? JungleTheme.background : JungleTheme.text;
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onHold,
-      child: Container(
-        margin: const EdgeInsetsDirectional.only(end: 5),
-        padding: const EdgeInsets.symmetric(horizontal: 9),
-        decoration: BoxDecoration(
-          color: selected ? JungleTheme.accent : JungleTheme.surfaceHigh,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(
-            color: selected ? JungleTheme.accent : JungleTheme.line,
+    final chip = GestureDetector(
+      onTap: widget.onTap,
+      onLongPress: widget.onHold,
+      child: widget.pending
+          ? AnimatedBuilder(animation: _pulse, builder: (_, _) => _body())
+          : _body(),
+    );
+    if (!widget.draggable) return chip;
+    return Draggable<String>(
+      data: widget.beat.id,
+      // Vertical only, for two reasons: the bank scrolls sideways and has to
+      // keep every sideways drag, and the arrangement is a list, so the only
+      // thing a drop decides is how far down it goes.
+      axis: Axis.vertical,
+      // The feedback hangs off the finger rather than under it, so the Beat
+      // being carried stays visible and the pointer position the Song view
+      // measures is exactly the pointer.
+      dragAnchorStrategy: pointerDragAnchorStrategy,
+      feedback: Material(
+        color: Colors.transparent,
+        child: Opacity(opacity: 0.9, child: _body()),
+      ),
+      childWhenDragging: Opacity(opacity: 0.3, child: _body()),
+      onDragStarted: HapticFeedback.selectionClick,
+      child: chip,
+    );
+  }
+
+  Widget _body() {
+    final beat = widget.beat;
+    final selected = widget.selected;
+    // A Beat that is waiting borrows the selected chip's outline and blinks it,
+    // which reads as about to happen without borrowing the fill: the filled
+    // chip stays the one you are hearing.
+    final border = widget.pending
+        ? Color.lerp(JungleTheme.line, JungleTheme.accent, _pulse.value)!
+        : (selected ? JungleTheme.accent : JungleTheme.line);
+    final foreground = selected
+        ? JungleTheme.background
+        : (widget.pending ? JungleTheme.accent : JungleTheme.text);
+    return Container(
+      margin: const EdgeInsetsDirectional.only(end: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 9),
+      decoration: BoxDecoration(
+        color: selected ? JungleTheme.accent : JungleTheme.surfaceHigh,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            // The machine is fixed for the Beat's life, so it belongs on the
+            // chip: which grid a tap opens should never be a surprise.
+            beat.isKit ? Icons.grid_view : Icons.content_cut,
+            size: 12,
+            color: foreground,
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              // The machine is fixed for the Beat's life, so it belongs on the
-              // chip: which grid a tap opens should never be a surprise.
-              beat.isKit ? Icons.grid_view : Icons.content_cut,
-              size: 12,
+          const SizedBox(width: 5),
+          Text(
+            beat.name,
+            style: TextStyle(
               color: foreground,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(width: 5),
-            Text(
-              beat.name,
-              style: TextStyle(
-                color: foreground,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '${beat.bars}',
+            style: TextStyle(
+              color: selected
+                  ? JungleTheme.background.withValues(alpha: 0.7)
+                  : JungleTheme.textDim,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(width: 4),
-            Text(
-              '${beat.bars}',
-              style: TextStyle(
-                color: selected
-                    ? JungleTheme.background.withValues(alpha: 0.7)
-                    : JungleTheme.textDim,
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

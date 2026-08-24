@@ -15,8 +15,7 @@ class SongEntry {
   static const int minRepeats = 1;
   static const int maxRepeats = 16;
 
-  SongEntry withRepeats(int value) =>
-      SongEntry(beatId: beatId, repeats: value);
+  SongEntry withRepeats(int value) => SongEntry(beatId: beatId, repeats: value);
 
   Map<String, Object?> toJson() => {'beatId': beatId, 'repeats': repeats};
 
@@ -61,6 +60,15 @@ class Song {
   }
 
   Song withEntry(SongEntry entry) => Song([...entries, entry]);
+
+  /// Inserts [entry] so that it lands at [index], which is what dropping a
+  /// Beat between two cards means. Out of range indices clamp to the ends
+  /// rather than being refused: a drop past the last card is an append.
+  Song withEntryAt(SongEntry entry, int index) {
+    final next = [...entries];
+    next.insert(index.clamp(0, next.length), entry);
+    return Song(next);
+  }
 
   Song withoutAt(int index) {
     if (index < 0 || index >= entries.length) return this;
