@@ -247,6 +247,27 @@ class AppLocalizationsKo extends AppLocalizations {
   String get subHint => '드래그로 PITCH 길게 눌러 액센트';
 
   @override
+  String get subEdit => '노트 편집';
+
+  @override
+  String get subNotesTitle => 'SUB 노트';
+
+  @override
+  String get subEditorHint => '칸을 눌러 노트를 놓으세요';
+
+  @override
+  String get subAccent => '액센트';
+
+  @override
+  String get subClearNote => '노트 지우기';
+
+  @override
+  String get subMoveEarlier => '노트를 한 스텝 앞으로';
+
+  @override
+  String get subMoveLater => '노트를 한 스텝 뒤로';
+
+  @override
   String get importTitle => '브레이크 가져오기';
 
   @override

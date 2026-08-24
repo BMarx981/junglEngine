@@ -908,9 +908,16 @@ class StudioController extends Notifier<StudioState> {
   void setSubStep(int step, int? semitone) {
     final beat = state.beat;
     final current = beat.sub.stepAt(step);
+    // Glide and accent belong to the step, not to the pitch on it: repitching
+    // a note keeps both, so aiming again at a note you already accented does
+    // not quietly undo the accent.
     final next = semitone == null
         ? const SubStep.rest()
-        : SubStep(semitone: semitone, tie: current.tie);
+        : SubStep(
+            semitone: semitone,
+            tie: current.tie,
+            accent: current.accent,
+          );
     _commit(beat.copyWith(sub: beat.sub.withStep(step, next)));
   }
 
@@ -925,6 +932,29 @@ class StudioController extends Notifier<StudioState> {
     final next = beat.sub.toggledAccent(step);
     if (identical(next, beat.sub)) return;
     _commit(beat.copyWith(sub: next));
+  }
+
+  /// Moves a note to another step, carrying its glide and accent with it.
+  ///
+  /// The lane is monophonic, so there is nothing to displace: whatever was on
+  /// the target step is written over. This exists because on a lane one bar
+  /// wide, clearing a note and finding the same pitch again by hand is the
+  /// part that hurts.
+  void moveSubStep(int from, int to) {
+    if (from == to) return;
+    final beat = state.beat;
+    final lane = beat.sub;
+    if (to < 0 || to >= lane.steps.length) return;
+    final cell = lane.stepAt(from);
+    if (cell.isRest) return;
+    // Step zero has nothing before it, so a note landing there drops its glide
+    // rather than sitting on a tie that means nothing.
+    final landed = to == 0 ? cell.copyWith(tie: false) : cell;
+    _commit(
+      beat.copyWith(
+        sub: lane.withStep(from, const SubStep.rest()).withStep(to, landed),
+      ),
+    );
   }
 
   void clearSub() {

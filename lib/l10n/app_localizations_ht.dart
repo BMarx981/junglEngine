@@ -252,6 +252,27 @@ class AppLocalizationsHt extends AppLocalizations {
   String get subHint => 'RALE PITCH KENBE AKSAN';
 
   @override
+  String get subEdit => 'MODIFYE NÒT YO';
+
+  @override
+  String get subNotesTitle => 'NÒT SUB';
+
+  @override
+  String get subEditorHint => 'TOUCHE YON KAZ POU METE YON NÒT';
+
+  @override
+  String get subAccent => 'AKSAN';
+
+  @override
+  String get subClearNote => 'EFASE NÒT LA';
+
+  @override
+  String get subMoveEarlier => 'DEPLASE NÒT LA YON PA PI BONÈ';
+
+  @override
+  String get subMoveLater => 'DEPLASE NÒT LA YON PA PI TA';
+
+  @override
   String get importTitle => 'ENPÒTE BREAK';
 
   @override

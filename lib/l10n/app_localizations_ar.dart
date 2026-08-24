@@ -268,6 +268,27 @@ class AppLocalizationsAr extends AppLocalizations {
   String get subHint => 'اسحب لضبط PITCH واضغط مطوّلًا للتشديد';
 
   @override
+  String get subEdit => 'تحرير النوتات';
+
+  @override
+  String get subNotesTitle => 'نوتات SUB';
+
+  @override
+  String get subEditorHint => 'اضغط على خانة لوضع نوتة';
+
+  @override
+  String get subAccent => 'تشديد';
+
+  @override
+  String get subClearNote => 'مسح النوتة';
+
+  @override
+  String get subMoveEarlier => 'تحريك النوتة خطوة للوراء';
+
+  @override
+  String get subMoveLater => 'تحريك النوتة خطوة للأمام';
+
+  @override
   String get importTitle => 'استيراد بريك';
 
   @override

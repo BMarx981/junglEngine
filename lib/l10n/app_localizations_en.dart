@@ -252,6 +252,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get subHint => 'DRAG PITCH HOLD ACCENT';
 
   @override
+  String get subEdit => 'EDIT NOTES';
+
+  @override
+  String get subNotesTitle => 'SUB NOTES';
+
+  @override
+  String get subEditorHint => 'TAP A CELL TO PLACE A NOTE';
+
+  @override
+  String get subAccent => 'ACCENT';
+
+  @override
+  String get subClearNote => 'CLEAR NOTE';
+
+  @override
+  String get subMoveEarlier => 'MOVE EARLIER';
+
+  @override
+  String get subMoveLater => 'MOVE LATER';
+
+  @override
   String get importTitle => 'IMPORT BREAK';
 
   @override

@@ -5,6 +5,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:junglengine/features/bass/sub_editor.dart';
+import 'package:junglengine/features/bass/sub_lane_view.dart';
 import 'package:junglengine/features/bass/sub_panel.dart';
 import 'package:junglengine/features/export/export_sheet.dart';
 import 'package:junglengine/features/grid/chop_grid.dart';
@@ -154,6 +156,30 @@ void main() {
         expect(exportSheet, isEmpty, reason: 'export in $where: $exportSheet');
         await tester.tapAt(const Offset(10, 10));
         await tester.pumpAndSettle();
+
+        // The sub note editor: a heading, a hint line and a footer of three
+        // buttons sharing one phone width.
+        await tester.tap(
+          find.descendant(
+            of: find.byType(SubLaneView),
+            matching: find.text('SUB'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'sub editor in $where');
+        final subEditor = _clipped(tester, find.byType(SubEditor)).toList();
+        expect(subEditor, isEmpty, reason: 'sub editor in $where: $subEditor');
+        // By its own button rather than by the scrim: this sheet is most of
+        // the screen, and a scrim tap that quietly missed would leave every
+        // assertion after it passing against a sheet that never opened.
+        await tester.tap(
+          find.descendant(
+            of: find.byType(SubEditor),
+            matching: find.byIcon(Icons.close),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(SubEditor), findsNothing, reason: where);
 
         // The sub panel: five parameter rows, each a label, a slider and a
         // value in a 34 pixel box.

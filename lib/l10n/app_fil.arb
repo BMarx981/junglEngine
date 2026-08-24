@@ -78,6 +78,13 @@
   "subTitle": "SUB SYNTH",
   "subClearLane": "LINISIN ANG LANE",
   "subHint": "I-DRAG ANG PITCH PINDUTIN PARA SA ACCENT",
+  "subEdit": "I-EDIT ANG MGA NOTA",
+  "subNotesTitle": "MGA SUB NOTA",
+  "subEditorHint": "PINDUTIN ANG KAHON PARA MAGLAGAY NG NOTA",
+  "subAccent": "ACCENT",
+  "subClearNote": "BURAHIN ANG NOTA",
+  "subMoveEarlier": "IUSOG ANG NOTA NANG ISANG STEP PAAGA",
+  "subMoveLater": "IUSOG ANG NOTA NANG ISANG STEP PAHULI",
 
   "importTitle": "MAG-IMPORT NG BREAK",
   "importBars": "BAR",

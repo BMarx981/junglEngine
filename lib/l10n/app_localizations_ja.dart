@@ -246,6 +246,27 @@ class AppLocalizationsJa extends AppLocalizations {
   String get subHint => 'ドラッグでPITCH 長押しでアクセント';
 
   @override
+  String get subEdit => 'ノートを編集';
+
+  @override
+  String get subNotesTitle => 'SUB ノート';
+
+  @override
+  String get subEditorHint => 'マスをタップしてノートを置く';
+
+  @override
+  String get subAccent => 'アクセント';
+
+  @override
+  String get subClearNote => 'ノートを消す';
+
+  @override
+  String get subMoveEarlier => 'ノートを1ステップ前へ';
+
+  @override
+  String get subMoveLater => 'ノートを1ステップ後ろへ';
+
+  @override
   String get importTitle => 'ブレイクを読み込む';
 
   @override

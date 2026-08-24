@@ -260,6 +260,27 @@ class AppLocalizationsRu extends AppLocalizations {
   String get subHint => 'ТЯНИ PITCH УДЕРЖИ АКЦЕНТ';
 
   @override
+  String get subEdit => 'РЕДАКТИРОВАТЬ НОТЫ';
+
+  @override
+  String get subNotesTitle => 'НОТЫ SUB';
+
+  @override
+  String get subEditorHint => 'НАЖМИ НА КЛЕТКУ, ЧТОБЫ ПОСТАВИТЬ НОТУ';
+
+  @override
+  String get subAccent => 'АКЦЕНТ';
+
+  @override
+  String get subClearNote => 'УБРАТЬ НОТУ';
+
+  @override
+  String get subMoveEarlier => 'СДВИНУТЬ НОТУ НА ШАГ РАНЬШЕ';
+
+  @override
+  String get subMoveLater => 'СДВИНУТЬ НОТУ НА ШАГ ПОЗЖЕ';
+
+  @override
   String get importTitle => 'ЗАГРУЗИТЬ БРЕЙК';
 
   @override

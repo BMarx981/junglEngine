@@ -508,6 +508,48 @@ abstract class AppLocalizations {
   /// **'DRAG PITCH HOLD ACCENT'**
   String get subHint;
 
+  /// Spoken by the screen reader for the button above the bass lane that opens the larger note editor. Not drawn on screen, so length does not matter.
+  ///
+  /// In en, this message translates to:
+  /// **'EDIT NOTES'**
+  String get subEdit;
+
+  /// Heading of the larger bass note editor, the counterpart to subTitle. Keep SUB in English: it labels the lane and the synth panel too, and all three must read as the same thing.
+  ///
+  /// In en, this message translates to:
+  /// **'SUB NOTES'**
+  String get subNotesTitle;
+
+  /// One line under the heading of the bass note editor, explaining that notes are placed by tapping a cell in the grid: the row is the pitch, the column is the step. Free to wrap onto a second line.
+  ///
+  /// In en, this message translates to:
+  /// **'TAP A CELL TO PLACE A NOTE'**
+  String get subEditorHint;
+
+  /// Button in the bass note editor that makes the selected note louder and brighter. Shares a row with two other buttons, so keep it short.
+  ///
+  /// In en, this message translates to:
+  /// **'ACCENT'**
+  String get subAccent;
+
+  /// Button in the bass note editor that erases the selected note, leaving silence on that step. Shares a row with two other buttons, so keep it short.
+  ///
+  /// In en, this message translates to:
+  /// **'CLEAR NOTE'**
+  String get subClearNote;
+
+  /// Spoken by the screen reader for the arrow that moves the selected bass note one step earlier in time. Not drawn on screen, so length does not matter.
+  ///
+  /// In en, this message translates to:
+  /// **'MOVE EARLIER'**
+  String get subMoveEarlier;
+
+  /// Spoken by the screen reader for the arrow that moves the selected bass note one step later in time. Not drawn on screen, so length does not matter.
+  ///
+  /// In en, this message translates to:
+  /// **'MOVE LATER'**
+  String get subMoveLater;
+
   /// Heading of the screen for turning an imported audio file into a usable drum break.
   ///
   /// In en, this message translates to:

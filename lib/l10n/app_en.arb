@@ -293,6 +293,34 @@
   "@subHint": {
     "description": "Hint above the bass lane: dragging a column changes the note's pitch, and holding it adds an accent, which is a louder and brighter note. Keep PITCH in English. Very tight, fits about 24 characters."
   },
+  "subEdit": "EDIT NOTES",
+  "@subEdit": {
+    "description": "Spoken by the screen reader for the button above the bass lane that opens the larger note editor. Not drawn on screen, so length does not matter."
+  },
+  "subNotesTitle": "SUB NOTES",
+  "@subNotesTitle": {
+    "description": "Heading of the larger bass note editor, the counterpart to subTitle. Keep SUB in English: it labels the lane and the synth panel too, and all three must read as the same thing."
+  },
+  "subEditorHint": "TAP A CELL TO PLACE A NOTE",
+  "@subEditorHint": {
+    "description": "One line under the heading of the bass note editor, explaining that notes are placed by tapping a cell in the grid: the row is the pitch, the column is the step. Free to wrap onto a second line."
+  },
+  "subAccent": "ACCENT",
+  "@subAccent": {
+    "description": "Button in the bass note editor that makes the selected note louder and brighter. Shares a row with two other buttons, so keep it short."
+  },
+  "subClearNote": "CLEAR NOTE",
+  "@subClearNote": {
+    "description": "Button in the bass note editor that erases the selected note, leaving silence on that step. Shares a row with two other buttons, so keep it short."
+  },
+  "subMoveEarlier": "MOVE EARLIER",
+  "@subMoveEarlier": {
+    "description": "Spoken by the screen reader for the arrow that moves the selected bass note one step earlier in time. Not drawn on screen, so length does not matter."
+  },
+  "subMoveLater": "MOVE LATER",
+  "@subMoveLater": {
+    "description": "Spoken by the screen reader for the arrow that moves the selected bass note one step later in time. Not drawn on screen, so length does not matter."
+  },
 
   "importTitle": "IMPORT BREAK",
   "@importTitle": {

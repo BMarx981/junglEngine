@@ -252,6 +252,27 @@ class AppLocalizationsFil extends AppLocalizations {
   String get subHint => 'I-DRAG ANG PITCH PINDUTIN PARA SA ACCENT';
 
   @override
+  String get subEdit => 'I-EDIT ANG MGA NOTA';
+
+  @override
+  String get subNotesTitle => 'MGA SUB NOTA';
+
+  @override
+  String get subEditorHint => 'PINDUTIN ANG KAHON PARA MAGLAGAY NG NOTA';
+
+  @override
+  String get subAccent => 'ACCENT';
+
+  @override
+  String get subClearNote => 'BURAHIN ANG NOTA';
+
+  @override
+  String get subMoveEarlier => 'IUSOG ANG NOTA NANG ISANG STEP PAAGA';
+
+  @override
+  String get subMoveLater => 'IUSOG ANG NOTA NANG ISANG STEP PAHULI';
+
+  @override
   String get importTitle => 'MAG-IMPORT NG BREAK';
 
   @override

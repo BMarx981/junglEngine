@@ -252,6 +252,27 @@ class AppLocalizationsPt extends AppLocalizations {
   String get subHint => 'ARRASTA PITCH SEGURA ACENTO';
 
   @override
+  String get subEdit => 'EDITAR NOTAS';
+
+  @override
+  String get subNotesTitle => 'NOTAS SUB';
+
+  @override
+  String get subEditorHint => 'TOQUE NUMA CASA PARA COLOCAR UMA NOTA';
+
+  @override
+  String get subAccent => 'ACENTO';
+
+  @override
+  String get subClearNote => 'APAGAR NOTA';
+
+  @override
+  String get subMoveEarlier => 'ADIANTAR A NOTA UM PASSO';
+
+  @override
+  String get subMoveLater => 'ATRASAR A NOTA UM PASSO';
+
+  @override
   String get importTitle => 'IMPORTAR BREAK';
 
   @override

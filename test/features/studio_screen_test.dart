@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:junglengine/features/bass/sub_editor.dart';
 import 'package:junglengine/features/bass/sub_lane_view.dart';
 import 'package:junglengine/features/grid/chop_grid.dart';
 import 'package:junglengine/features/grid/step_mod_sheet.dart';
@@ -50,6 +51,14 @@ Finder inBarStrip(String text) =>
 /// have to say which SONG they mean.
 Finder inExportSheet(String text) =>
     find.descendant(of: find.byType(ExportSheet), matching: find.text(text));
+
+/// Opens the larger sub note editor from the lane's own header.
+Future<void> openSubEditor(WidgetTester tester) async {
+  await tester.tap(
+    find.descendant(of: find.byType(SubLaneView), matching: find.text('SUB')),
+  );
+  await tester.pumpAndSettle();
+}
 
 /// Creates a one bar Kit Beat through the bank, the way a user would.
 Future<void> makeKitBeat(WidgetTester tester) async {
@@ -238,6 +247,109 @@ void main() {
     await tester.tapAt(Offset(lane.left + columnWidth * 6.5, tieY));
     await tester.pump();
     expect(engine.lastSpec!.beat.sub.stepAt(6).tie, isFalse);
+  });
+
+  testWidgets('the sub editor writes the pitch of the row you tap', (
+    tester,
+  ) async {
+    final engine = await pumpStudio(tester);
+    await openSubEditor(tester);
+
+    final roll = tester.getRect(find.byKey(SubEditor.rollKey));
+    final columnWidth = roll.width / 16;
+
+    // An empty lane opens with the root row in the middle of the roll, so the
+    // vertical centre is the root and one row above it is a semitone up.
+    await tester.tapAt(Offset(roll.left + columnWidth * 3.5, roll.center.dy));
+    await tester.pump();
+    expect(engine.lastSpec!.beat.sub.stepAt(3).semitone, 0);
+
+    await tester.tapAt(
+      Offset(
+        roll.left + columnWidth * 5.5,
+        roll.center.dy - SubEditor.rowHeight,
+      ),
+    );
+    await tester.pump();
+    expect(engine.lastSpec!.beat.sub.stepAt(5).semitone, 1);
+
+    // A second tap on the note that is already selected clears it.
+    await tester.tapAt(
+      Offset(
+        roll.left + columnWidth * 5.5,
+        roll.center.dy - SubEditor.rowHeight,
+      ),
+    );
+    await tester.pump();
+    expect(engine.lastSpec!.beat.sub.stepAt(5).isRest, isTrue);
+  });
+
+  testWidgets('the sub editor buttons glide, accent and clear the selection', (
+    tester,
+  ) async {
+    final engine = await pumpStudio(tester);
+    await openSubEditor(tester);
+
+    final roll = tester.getRect(find.byKey(SubEditor.rollKey));
+    final columnWidth = roll.width / 16;
+    await tester.tapAt(Offset(roll.left + columnWidth * 4.5, roll.center.dy));
+    await tester.pump();
+
+    // GLIDE is the tie strip's job done with a button you can actually hit.
+    await tester.tap(find.text('GLIDE'));
+    await tester.pump();
+    expect(engine.lastSpec!.beat.sub.stepAt(4).tie, isTrue);
+
+    await tester.tap(find.text(l10n.subAccent));
+    await tester.pump();
+    expect(engine.lastSpec!.beat.sub.stepAt(4).accent, isTrue);
+
+    // Repitching keeps both: they belong to the step, not to the note on it.
+    await tester.tapAt(
+      Offset(
+        roll.left + columnWidth * 4.5,
+        roll.center.dy + SubEditor.rowHeight * 2,
+      ),
+    );
+    await tester.pump();
+    final repitched = engine.lastSpec!.beat.sub.stepAt(4);
+    expect(repitched.semitone, -2);
+    expect(repitched.tie, isTrue);
+    expect(repitched.accent, isTrue);
+
+    await tester.tap(find.text(l10n.subClearNote));
+    await tester.pump();
+    expect(engine.lastSpec!.beat.sub.stepAt(4).isRest, isTrue);
+  });
+
+  testWidgets('the sub editor moves a note a step at a time', (tester) async {
+    final engine = await pumpStudio(tester);
+    await openSubEditor(tester);
+
+    final roll = tester.getRect(find.byKey(SubEditor.rollKey));
+    final columnWidth = roll.width / 16;
+    await tester.tapAt(
+      Offset(
+        roll.left + columnWidth * 6.5,
+        roll.center.dy - SubEditor.rowHeight * 3,
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text(l10n.subAccent));
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.chevron_right));
+    await tester.pump();
+    expect(engine.lastSpec!.beat.sub.stepAt(6).isRest, isTrue);
+    final moved = engine.lastSpec!.beat.sub.stepAt(7);
+    expect(moved.semitone, 3);
+    expect(moved.accent, isTrue, reason: 'the accent travels with the note');
+
+    // The selection follows it, so the next nudge moves the same note again.
+    await tester.tap(find.byIcon(Icons.chevron_left));
+    await tester.pump();
+    expect(engine.lastSpec!.beat.sub.stepAt(6).semitone, 3);
+    expect(engine.lastSpec!.beat.sub.stepAt(7).isRest, isTrue);
   });
 
   testWidgets('the sub panel exposes exactly five parameters', (tester) async {

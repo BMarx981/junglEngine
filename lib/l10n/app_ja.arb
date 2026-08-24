@@ -78,6 +78,13 @@
   "subTitle": "SUB シンセ",
   "subClearLane": "レーンを消す",
   "subHint": "ドラッグでPITCH 長押しでアクセント",
+  "subEdit": "ノートを編集",
+  "subNotesTitle": "SUB ノート",
+  "subEditorHint": "マスをタップしてノートを置く",
+  "subAccent": "アクセント",
+  "subClearNote": "ノートを消す",
+  "subMoveEarlier": "ノートを1ステップ前へ",
+  "subMoveLater": "ノートを1ステップ後ろへ",
 
   "importTitle": "ブレイクを読み込む",
   "importBars": "小節数",

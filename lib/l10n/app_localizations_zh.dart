@@ -246,6 +246,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get subHint => '拖动改 PITCH 长按加重音';
 
   @override
+  String get subEdit => '编辑音符';
+
+  @override
+  String get subNotesTitle => 'SUB 音符';
+
+  @override
+  String get subEditorHint => '点格子放一个音符';
+
+  @override
+  String get subAccent => '重音';
+
+  @override
+  String get subClearNote => '清除音符';
+
+  @override
+  String get subMoveEarlier => '音符前移一步';
+
+  @override
+  String get subMoveLater => '音符后移一步';
+
+  @override
   String get importTitle => '导入鼓点';
 
   @override

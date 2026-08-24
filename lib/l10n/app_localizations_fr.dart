@@ -252,6 +252,27 @@ class AppLocalizationsFr extends AppLocalizations {
   String get subHint => 'GLISSE PITCH MAINTIENS ACCENT';
 
   @override
+  String get subEdit => 'MODIFIER LES NOTES';
+
+  @override
+  String get subNotesTitle => 'NOTES SUB';
+
+  @override
+  String get subEditorHint => 'TOUCHE UNE CASE POUR POSER UNE NOTE';
+
+  @override
+  String get subAccent => 'ACCENT';
+
+  @override
+  String get subClearNote => 'EFFACER LA NOTE';
+
+  @override
+  String get subMoveEarlier => 'AVANCER LA NOTE D\'UN PAS';
+
+  @override
+  String get subMoveLater => 'RECULER LA NOTE D\'UN PAS';
+
+  @override
   String get importTitle => 'IMPORTER UN BREAK';
 
   @override

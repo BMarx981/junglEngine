@@ -9,6 +9,7 @@ import '../../state/studio.dart';
 import '../../theme.dart';
 import '../transport/playhead_painter.dart';
 import 'note_names.dart';
+import 'sub_editor.dart';
 
 /// The sub lane.
 ///
@@ -18,12 +19,17 @@ import 'note_names.dart';
 ///
 /// It shows the same bar the drum grid above it is showing, so a bassline is
 /// always written against the drums it is under.
+///
+/// Two octaves in a hundred pixels is four pixels a semitone, which is fine
+/// for sketching a line and hopeless for landing on a particular note. The
+/// button in the header opens [SubEditor], which is the same lane with room to
+/// aim at.
 class SubLaneView extends ConsumerStatefulWidget {
   const SubLaneView({super.key});
 
   static const double pitchHeight = 104;
   static const double tieHeight = 20;
-  static const double headerHeight = 22;
+  static const double headerHeight = 26;
 
   static const double totalHeight = pitchHeight + tieHeight + headerHeight;
 
@@ -49,12 +55,38 @@ class _SubLaneViewState extends ConsumerState<SubLaneView> {
           height: SubLaneView.headerHeight,
           child: Row(
             children: [
-              const SizedBox(width: 4),
-              Text(
-                'SUB',
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(color: JungleTheme.sub),
+              // The label doubles as the door to the editor: it is already the
+              // thing you look at when you want to work on the bassline, and
+              // the row has no width for a second control.
+              Semantics(
+                label: context.l10n.subEdit,
+                button: true,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => SubEditor.show(context),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 3,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'SUB',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: JungleTheme.sub),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.open_in_full,
+                          size: 12,
+                          color: JungleTheme.sub,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
               const Spacer(),
               // The hint is the longest thing in this row and the least

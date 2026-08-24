@@ -78,6 +78,13 @@
   "subTitle": "مركّب SUB",
   "subClearLane": "إفراغ المسار",
   "subHint": "اسحب لضبط PITCH واضغط مطوّلًا للتشديد",
+  "subEdit": "تحرير النوتات",
+  "subNotesTitle": "نوتات SUB",
+  "subEditorHint": "اضغط على خانة لوضع نوتة",
+  "subAccent": "تشديد",
+  "subClearNote": "مسح النوتة",
+  "subMoveEarlier": "تحريك النوتة خطوة للوراء",
+  "subMoveLater": "تحريك النوتة خطوة للأمام",
 
   "importTitle": "استيراد بريك",
   "importBars": "المازورات",

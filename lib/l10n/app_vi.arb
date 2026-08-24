@@ -78,6 +78,13 @@
   "subTitle": "SUB SYNTH",
   "subClearLane": "XOÁ LÀN",
   "subHint": "KÉO ĐỂ CHỈNH PITCH GIỮ ĐỂ NHẤN",
+  "subEdit": "SỬA NỐT",
+  "subNotesTitle": "NỐT SUB",
+  "subEditorHint": "CHẠM VÀO Ô ĐỂ ĐẶT MỘT NỐT",
+  "subAccent": "NHẤN",
+  "subClearNote": "XOÁ NỐT",
+  "subMoveEarlier": "DỜI NỐT SỚM MỘT BƯỚC",
+  "subMoveLater": "DỜI NỐT TRỄ MỘT BƯỚC",
 
   "importTitle": "NHẬP BREAK",
   "importBars": "Ô NHỊP",

@@ -248,6 +248,27 @@ class AppLocalizationsVi extends AppLocalizations {
   String get subHint => 'KÉO ĐỂ CHỈNH PITCH GIỮ ĐỂ NHẤN';
 
   @override
+  String get subEdit => 'SỬA NỐT';
+
+  @override
+  String get subNotesTitle => 'NỐT SUB';
+
+  @override
+  String get subEditorHint => 'CHẠM VÀO Ô ĐỂ ĐẶT MỘT NỐT';
+
+  @override
+  String get subAccent => 'NHẤN';
+
+  @override
+  String get subClearNote => 'XOÁ NỐT';
+
+  @override
+  String get subMoveEarlier => 'DỜI NỐT SỚM MỘT BƯỚC';
+
+  @override
+  String get subMoveLater => 'DỜI NỐT TRỄ MỘT BƯỚC';
+
+  @override
   String get importTitle => 'NHẬP BREAK';
 
   @override

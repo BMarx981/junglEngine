@@ -78,6 +78,13 @@
   "subTitle": "SUB 合成器",
   "subClearLane": "清空音轨",
   "subHint": "拖动改 PITCH 长按加重音",
+  "subEdit": "编辑音符",
+  "subNotesTitle": "SUB 音符",
+  "subEditorHint": "点格子放一个音符",
+  "subAccent": "重音",
+  "subClearNote": "清除音符",
+  "subMoveEarlier": "音符前移一步",
+  "subMoveLater": "音符后移一步",
 
   "importTitle": "导入鼓点",
   "importBars": "小节数",

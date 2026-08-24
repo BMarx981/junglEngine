@@ -78,6 +78,13 @@
   "subTitle": "SUB SINTE",
   "subClearLane": "VACIAR PISTA",
   "subHint": "ARRASTRA PITCH MANTÉN ACENTO",
+  "subEdit": "EDITAR NOTAS",
+  "subNotesTitle": "SUB NOTAS",
+  "subEditorHint": "TOCA UNA CASILLA PARA PONER UNA NOTA",
+  "subAccent": "ACENTO",
+  "subClearNote": "BORRAR NOTA",
+  "subMoveEarlier": "ADELANTAR LA NOTA UN PASO",
+  "subMoveLater": "ATRASAR LA NOTA UN PASO",
 
   "importTitle": "IMPORTAR BREAK",
   "importBars": "COMPASES",

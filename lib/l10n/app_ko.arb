@@ -78,6 +78,13 @@
   "subTitle": "SUB 신스",
   "subClearLane": "레인 비우기",
   "subHint": "드래그로 PITCH 길게 눌러 액센트",
+  "subEdit": "노트 편집",
+  "subNotesTitle": "SUB 노트",
+  "subEditorHint": "칸을 눌러 노트를 놓으세요",
+  "subAccent": "액센트",
+  "subClearNote": "노트 지우기",
+  "subMoveEarlier": "노트를 한 스텝 앞으로",
+  "subMoveLater": "노트를 한 스텝 뒤로",
 
   "importTitle": "브레이크 가져오기",
   "importBars": "마디",

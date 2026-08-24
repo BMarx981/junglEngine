@@ -78,6 +78,13 @@
   "subTitle": "SUB SYNTHÉ",
   "subClearLane": "VIDER LA PISTE",
   "subHint": "GLISSE PITCH MAINTIENS ACCENT",
+  "subEdit": "MODIFIER LES NOTES",
+  "subNotesTitle": "NOTES SUB",
+  "subEditorHint": "TOUCHE UNE CASE POUR POSER UNE NOTE",
+  "subAccent": "ACCENT",
+  "subClearNote": "EFFACER LA NOTE",
+  "subMoveEarlier": "AVANCER LA NOTE D'UN PAS",
+  "subMoveLater": "RECULER LA NOTE D'UN PAS",
 
   "importTitle": "IMPORTER UN BREAK",
   "importBars": "MESURES",

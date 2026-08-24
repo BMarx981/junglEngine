@@ -78,6 +78,13 @@
   "subTitle": "SUB SENTE",
   "subClearLane": "EFASE LIY LAN",
   "subHint": "RALE PITCH KENBE AKSAN",
+  "subEdit": "MODIFYE NÒT YO",
+  "subNotesTitle": "NÒT SUB",
+  "subEditorHint": "TOUCHE YON KAZ POU METE YON NÒT",
+  "subAccent": "AKSAN",
+  "subClearNote": "EFASE NÒT LA",
+  "subMoveEarlier": "DEPLASE NÒT LA YON PA PI BONÈ",
+  "subMoveLater": "DEPLASE NÒT LA YON PA PI TA",
 
   "importTitle": "ENPÒTE BREAK",
   "importBars": "MEZI",

@@ -78,6 +78,13 @@
   "subTitle": "SUB СИНТ",
   "subClearLane": "ОЧИСТИТЬ ДОРОЖКУ",
   "subHint": "ТЯНИ PITCH УДЕРЖИ АКЦЕНТ",
+  "subEdit": "РЕДАКТИРОВАТЬ НОТЫ",
+  "subNotesTitle": "НОТЫ SUB",
+  "subEditorHint": "НАЖМИ НА КЛЕТКУ, ЧТОБЫ ПОСТАВИТЬ НОТУ",
+  "subAccent": "АКЦЕНТ",
+  "subClearNote": "УБРАТЬ НОТУ",
+  "subMoveEarlier": "СДВИНУТЬ НОТУ НА ШАГ РАНЬШЕ",
+  "subMoveLater": "СДВИНУТЬ НОТУ НА ШАГ ПОЗЖЕ",
 
   "importTitle": "ЗАГРУЗИТЬ БРЕЙК",
   "importBars": "ТАКТЫ",
