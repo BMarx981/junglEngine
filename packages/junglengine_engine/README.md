@@ -82,6 +82,19 @@ something to vendor, and once before every compile, so editing Rust and hitting
 run works the way editing Dart does. Gradle runs the Android script before
 `preBuild`.
 
+Two things about that phase, both learned the hard way:
+
+- It is `:always_out_of_date`, with no declared outputs. It used to declare a
+  stamp file the script never wrote, and Xcode read that as a phase it had
+  already done: the crate was then only ever rebuilt by hand, which is a stale
+  engine in a build that looks fine. Cargo is what decides whether there is
+  work, and it decides in milliseconds when there is not.
+- **A Rust edit needs two builds on the Apple platforms.** The phase rebuilds
+  the vendored library, but the copy that gets linked into the app was chosen
+  before it ran, so the first build after an edit produces the artifact and the
+  second one ships it. `nm -g` on the framework inside the built app is how to
+  check which one you have.
+
 CocoaPods only. Swift Package Manager has no equivalent of `prepare_command`
 and the build has to run cargo before anything can be vendored, so `flutter
 build` warns that this plugin does not support SPM. It still builds.

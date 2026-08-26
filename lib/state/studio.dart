@@ -288,8 +288,12 @@ class StudioController extends Notifier<StudioState> {
     // controller asked for it. See [_onTransport].
     final transport = _engine.transport;
     transport.addListener(_onTransport);
+    // The engine reopens its output when the phone gives it back, and can be
+    // handed a different rate when it does. See [_reloadForSampleRate].
+    final engine = _engine..onSampleRateChanged = _reloadForSampleRate;
     ref.onDispose(() {
       transport.removeListener(_onTransport);
+      engine.onSampleRateChanged = null;
       _saveTimer?.cancel();
       _saveTimer = null;
     });
@@ -397,6 +401,37 @@ class StudioController extends Notifier<StudioState> {
         status: StudioStatus.failed,
         errorMessage: '$error',
       );
+    }
+  }
+
+  /// Decodes the project's audio again, because the engine came back at a rate
+  /// it was not running at before.
+  ///
+  /// A phone can change route while the output is closed -- headphones in
+  /// during a call, the speaker after one -- and come back running on another
+  /// clock. Everything already decoded is then at the old rate and would play
+  /// at the wrong speed. The engine cannot fix that from where it is standing:
+  /// it holds samples, and the bundled asset or imported file they came from
+  /// is the studio's business. So it says the rate moved and this answers.
+  ///
+  /// Rare enough that it does nothing clever: the same load the boot does, and
+  /// the spec published again behind it. The transport is stopped throughout,
+  /// because a resume does not start playback.
+  Future<void> _reloadForSampleRate() async {
+    if (state.status != StudioStatus.ready) return;
+    try {
+      final clip = await BreakLibrary.load(state.breakRef, _engine.sampleRate);
+      final kitClips = await KitLibrary.load(state.kitRef, _engine.sampleRate);
+      state = state.copyWith(
+        clip: clip,
+        kitClips: kitClips,
+        analysis: SliceAnalysis.of(clip, state.beat.sliceCount),
+      );
+      _syncEngine();
+    } on Object catch (error) {
+      // Not shown to anyone: the break that is loaded still plays, at the
+      // wrong speed, which is better than an error over a groove.
+      debugPrint('junglengine: clips not reloaded at the new rate ($error)');
     }
   }
 

@@ -113,6 +113,36 @@ class FakeAudioEngine implements AudioEngine {
     );
   }
 
+  /// Whether the platform has taken the output away.
+  bool suspended = false;
+  int suspendCount = 0;
+  int resumeCount = 0;
+
+  @override
+  Future<void> Function()? onSampleRateChanged;
+
+  @override
+  Future<void> suspend() async {
+    suspended = true;
+    suspendCount++;
+    await stop();
+  }
+
+  @override
+  Future<void> resume() async {
+    suspended = false;
+    resumeCount++;
+  }
+
+  /// Comes back at a rate the app did not decode for, the way a phone that
+  /// changed route while it was away does. The engine cannot reload the
+  /// clips; whoever decoded them has to, and this is how it is told to.
+  Future<void> resumeAt(int rate) async {
+    sampleRate = rate;
+    await resume();
+    await onSampleRateChanged?.call();
+  }
+
   @override
   Future<void> auditionSlice(int sliceIndex) async =>
       auditioned.add(sliceIndex);

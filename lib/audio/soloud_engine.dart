@@ -119,7 +119,11 @@ class SoLoudAudioEngine implements AudioEngine {
   @override
   Future<void> initialize() async {
     if (_initialized) return;
-    await configureAudioSession(stop);
+    await configureAudioSession(
+      onStop: stop,
+      onSuspend: suspend,
+      onResume: resume,
+    );
     await SoLoud.instance.init(
       sampleRate: sampleRate,
       channels: Channels.stereo,
@@ -284,6 +288,35 @@ class SoLoudAudioEngine implements AudioEngine {
       entryIndex: -1,
     );
   }
+
+  /// Stopping, and nothing more.
+  ///
+  /// The Lira engine hands its output back here, which is what makes an
+  /// interruption free and a backgrounded app quiet. This one cannot: SoLoud
+  /// owns its backend device from `init` to `deinit`, and a `deinit` would
+  /// take every cached [AudioSource] with it -- every slice, every Kit slot --
+  /// to be re-cut and re-encoded on the way back. Tearing all of that down for
+  /// a phone call is a worse trade than leaving an idle device open, and this
+  /// is the engine that is not being changed while it is the one that ships.
+  ///
+  /// So the two engines are honestly different here, and that difference
+  /// belongs in the battery leg of the A/B rather than hidden behind a method
+  /// that pretends to do the same thing. See docs/M4.md, stage 5.
+  @override
+  Future<void> suspend() => stop();
+
+  @override
+  Future<void> resume() async {
+    // Nothing to take back: the device was never given up. The next [start]
+    // builds a fresh buffer stream, which is what it does after any stop.
+  }
+
+  /// Never called on this engine. It is told its rate at [initialize] and it
+  /// never opens a device again, so the rate it is running at cannot move
+  /// underneath the clips the app has decoded. Here because the interface has
+  /// it, and the interface has it for the engine that reopens.
+  @override
+  Future<void> Function()? onSampleRateChanged;
 
   Future<void> _teardownStream() async {
     _feeder?.cancel();

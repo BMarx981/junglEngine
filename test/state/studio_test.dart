@@ -821,4 +821,35 @@ void main() {
       expect(container.read(studioProvider).beat.chop.sliceAt(1), 9);
     });
   });
+
+  group('the output coming back at another rate', () {
+    test('decodes the project audio again and republishes', () async {
+      // A phone that changed route while the output was closed comes back on
+      // another clock. Everything in memory is then at the old rate and would
+      // play at the wrong speed, and the engine cannot fix it: it holds
+      // samples, not the assets they were decoded from. See docs/M4.md.
+      expect(state().clip!.sampleRate, engine.sampleRate);
+      final was = state().clip!.sampleRate;
+
+      await engine.resumeAt(48000);
+      // The break is resampled on another isolate, so this is not immediate.
+      for (var i = 0; i < 200 && state().clip!.sampleRate != 48000; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+
+      expect(was, isNot(48000));
+      expect(state().clip!.sampleRate, 48000);
+      expect(state().kitClips.first.sampleRate, 48000);
+      expect(
+        engine.lastSpec!.sampleRate,
+        48000,
+        reason: 'the reloaded audio has to reach the engine, not just state',
+      );
+      expect(
+        state().analysis,
+        isNotNull,
+        reason: 'the slice waveforms are drawn from the clip that was replaced',
+      );
+    });
+  });
 }

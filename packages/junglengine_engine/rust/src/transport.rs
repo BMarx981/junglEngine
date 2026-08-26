@@ -15,6 +15,19 @@ use std::sync::atomic::{AtomicI32, AtomicU32, AtomicU64, Ordering};
 
 use crate::renderer::RenderPosition;
 
+/// The output is open and the callback is running.
+pub const DEVICE_OPEN: u32 = 0;
+
+/// The device was handed back on purpose: an interruption, or the app going to
+/// the background. Nothing is wrong and a resume will take it again.
+pub const DEVICE_SUSPENDED: u32 = 1;
+
+/// The stream failed underneath us. The control thread closes what is left of
+/// it and waits to be told to try again, because on a phone the reason is
+/// usually something that has to finish first -- a call, a route change -- and
+/// reopening in a loop would only fail in a loop.
+pub const DEVICE_LOST: u32 = 2;
+
 /// The layout Dart maps. `#[repr(C)]` and the field order below are the wire
 /// format: `JeTransport` in `packages/junglengine_engine/lib/src/bindings.dart`
 /// mirrors it field for field. The 64 bit fields come first so neither side
@@ -63,6 +76,18 @@ pub struct TransportShared {
     /// Which section of the plan is sounding. A Beat id is a string, and the
     /// callback may not touch one, so the index crosses instead.
     pub section: AtomicI32,
+
+    /// What the output device is doing: [`DEVICE_OPEN`], [`DEVICE_SUSPENDED`]
+    /// or [`DEVICE_LOST`].
+    ///
+    /// Deliberately outside the seqlock above, because it is the one field
+    /// here the audio callback does not write. The control thread sets it when
+    /// it opens or closes the device, and cpal's error callback sets it to
+    /// [`DEVICE_LOST`] when the stream fails underneath us -- a phone call, a
+    /// route change, media services restarting. Dart reads it off the same
+    /// mapped pointer as the playhead, which is what lets it notice a device
+    /// that went away without polling the engine for it. See docs/M4.md.
+    pub device_state: AtomicU32,
 }
 
 impl Default for TransportShared {
@@ -79,6 +104,7 @@ impl Default for TransportShared {
             step_count: AtomicI32::new(16),
             entry_index: AtomicI32::new(-1),
             section: AtomicI32::new(0),
+            device_state: AtomicU32::new(DEVICE_OPEN),
         }
     }
 }
@@ -144,6 +170,17 @@ impl TransportShared {
         std::sync::atomic::fence(Ordering::Release);
         self.version.store(version.wrapping_add(2), Ordering::Relaxed);
     }
+
+    /// Says what the device is doing. Called by the control thread, and by
+    /// cpal's error callback with [`DEVICE_LOST`]: a relaxed store, which is
+    /// all an error callback is allowed to do and all this needs.
+    pub fn set_device_state(&self, state: u32) {
+        self.device_state.store(state, Ordering::Relaxed);
+    }
+
+    pub fn device_state(&self) -> u32 {
+        self.device_state.load(Ordering::Relaxed)
+    }
 }
 
 #[cfg(test)]
@@ -155,8 +192,37 @@ mod tests {
     /// sequencer rather than in the wire format.
     #[test]
     fn the_shared_layout_is_what_dart_maps() {
-        assert_eq!(std::mem::size_of::<TransportShared>(), 64);
+        // Five u64s, then six u32s, tail padded to the 8 byte alignment the
+        // u64s ask for.
+        assert_eq!(std::mem::size_of::<TransportShared>(), 72);
         assert_eq!(std::mem::align_of::<TransportShared>(), 8);
+    }
+
+    /// The device state is not under the seqlock, and must not be: the thread
+    /// that says the stream has failed is not the thread writing the playhead.
+    #[test]
+    fn a_device_state_change_leaves_the_playhead_alone() {
+        let shared = TransportShared::default();
+        assert_eq!(shared.device_state(), DEVICE_OPEN);
+
+        shared.publish(
+            3,
+            512,
+            true,
+            0,
+            RenderPosition {
+                step: 5,
+                step_count: 16,
+                entry_index: -1,
+                position: 0.5,
+            },
+        );
+        let version = shared.version.load(Ordering::Relaxed);
+
+        shared.set_device_state(DEVICE_LOST);
+        assert_eq!(shared.device_state(), DEVICE_LOST);
+        assert_eq!(shared.version.load(Ordering::Relaxed), version);
+        assert_eq!(shared.step.load(Ordering::Relaxed), 5);
     }
 
     #[test]

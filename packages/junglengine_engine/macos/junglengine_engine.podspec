@@ -32,9 +32,15 @@ The mixer, the sub synth, the device and the C ABI between them, in Rust.
   # the way editing Dart does. Cargo does nothing when nothing changed.
   s.script_phase = {
     :name => 'Build the junglEngine audio engine',
-    :script => 'sh "$PODS_TARGET_SRCROOT/../rust/build_apple.sh" ios',
+    :script => 'sh "$PODS_TARGET_SRCROOT/../rust/build_apple.sh" macos',
     :execution_position => :before_compile,
-    :output_files => ['$(DERIVED_FILE_DIR)/junglengine_engine.stamp'],
+    # No outputs, and deliberately: cargo is the thing that decides whether
+    # there is anything to do, and it decides in milliseconds when there is
+    # not. A declared output file made Xcode skip the phase for good after the
+    # first build, so a Rust edit reached a phone only if somebody remembered
+    # to run the script by hand -- which is the sort of thing that is noticed
+    # a week later, in a measurement.
+    :always_out_of_date => '1',
   }
 
   # What cpal's CoreAudio backend calls into. A Rust static library carries no

@@ -155,6 +155,40 @@ abstract class AudioEngine {
 
   Future<void> stop();
 
+  /// The platform is taking the output away, or is about to: an interruption
+  /// beginning, or the app going to the background. Stops the transport and
+  /// gives the device back.
+  ///
+  /// Not a user action and not on any screen. A phone hands its output around
+  /// between apps and calls, and an app that holds one it cannot use is a
+  /// battery cost with nothing listening at the end of it. Everything the
+  /// engine has loaded survives, so [resume] carries on rather than reloads.
+  ///
+  /// Idempotent.
+  Future<void> suspend();
+
+  /// The output is available again: the interruption ended, or the app came
+  /// back to the foreground.
+  ///
+  /// The transport stays stopped. A call ending is not a request to play.
+  ///
+  /// May come back at a different [sampleRate] than it went away at, because a
+  /// phone can return on a different route than it left on. When it does,
+  /// everything the app has decoded is at the wrong rate and
+  /// [onSampleRateChanged] is what says so.
+  ///
+  /// Idempotent, and a no-op when the device never went away.
+  Future<void> resume();
+
+  /// Called after the engine has reopened at a rate it was not running at
+  /// before, so that whoever decoded the audio can decode it again.
+  ///
+  /// The engine cannot do it: what a clip was decoded *from* is a bundled
+  /// asset or an imported file, and neither is something the audio layer
+  /// knows about. So it reports the change and the studio reloads. Until it
+  /// does, the transport is stopped and what is loaded is at the old rate.
+  set onSampleRateChanged(Future<void> Function()? handler);
+
   /// Plays a single slice of the current break immediately, for tap feedback.
   /// Never affects the transport.
   Future<void> auditionSlice(int sliceIndex);

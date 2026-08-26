@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,14 +39,22 @@ class _JungleAppState extends ConsumerState<JungleApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState lifecycle) {
-    // The block feeder cannot keep a stream fed while the app is backgrounded,
-    // so stop rather than let it underrun and stutter on return.
     if (lifecycle == AppLifecycleState.paused ||
         lifecycle == AppLifecycleState.detached) {
-      ref.read(audioEngineProvider).stop();
+      // The output goes back rather than merely quiet. Nothing can keep a
+      // stream fed from the background anyway -- the block feeder does not run
+      // there and the Rust callback has nothing to render -- and an open
+      // device with nobody listening is battery. Both engines answer this the
+      // way they can: see docs/M4.md, stage 5.
+      unawaited(ref.read(audioEngineProvider).suspend());
       // Backgrounding is the last moment there reliably is: the OS can kill the
       // app from the switcher without another callback.
       ref.read(studioProvider.notifier).flushSave();
+    }
+    if (lifecycle == AppLifecycleState.resumed) {
+      // Asking for the output back, which is a no-op on an engine that never
+      // gave it up and on a device that never took it away.
+      unawaited(ref.read(audioEngineProvider).resume());
     }
   }
 

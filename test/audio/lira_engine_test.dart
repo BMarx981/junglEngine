@@ -196,6 +196,89 @@ void main() {
       expect(engine.isInitialized, isFalse);
     });
 
+    testWidgets('gives the device back and takes it again', (tester) async {
+      // What a phone call does to an engine, without the phone call. The
+      // device closes, the transport stops with it, and everything the engine
+      // was holding -- the loaded plan, the break it reads -- is still there
+      // when the output comes back. See docs/M4.md, stage 5.
+      await tester.runAsync(() async {
+        await engine.setSpec(_chopSpec());
+        await engine.start();
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+      });
+      await tester.pump();
+      expect(engine.transport.value.playing, isTrue);
+
+      await tester.runAsync(() async {
+        await engine.suspend();
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+      });
+      await tester.pump();
+      expect(
+        engine.transport.value.playing,
+        isFalse,
+        reason: 'a transport that was running when the output went away must '
+            'not be running when it comes back',
+      );
+
+      final rate = engine.sampleRate;
+      await tester.runAsync(() async {
+        // Painting carries on while the output is gone: the app is still on
+        // screen during a call. This is held rather than published, and it is
+        // what the device gets when it opens.
+        await engine.setSpec(_editedChopSpec());
+        await engine.resume();
+        await engine.start();
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pump();
+
+      expect(engine.sampleRate, rate);
+      expect(
+        engine.transport.value.playing,
+        isTrue,
+        reason: 'the reopened device has to render, not merely open',
+      );
+      expect(engine.transport.value.step, inInclusiveRange(0, 15));
+
+      await tester.runAsync(() => engine.stop());
+      await tester.pump();
+    });
+
+    testWidgets('plays after a suspend even without an explicit resume', (
+      tester,
+    ) async {
+      // A tap on the transport is a person saying they expect sound now, so it
+      // is the one place a closed output is worth reopening without being told
+      // to. Everything else waits for the platform to say the output is back.
+      await tester.runAsync(() async {
+        await engine.setSpec(_chopSpec());
+        await engine.suspend();
+        await engine.start();
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pump();
+
+      expect(engine.transport.value.playing, isTrue);
+
+      await tester.runAsync(() => engine.stop());
+      await tester.pump();
+    });
+
+    testWidgets('shuts down cleanly while it is suspended', (tester) async {
+      await tester.runAsync(() async {
+        await engine.setSpec(_chopSpec());
+        await engine.start();
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        await engine.suspend();
+        // The app killed from the switcher while the output is still away,
+        // which is the ordinary way a backgrounded app ends.
+        await engine.shutdown();
+      });
+      await tester.pump();
+      expect(engine.isInitialized, isFalse);
+    });
+
     testWidgets('auditions without touching the transport', (tester) async {
       await tester.runAsync(() async {
         await engine.setSpec(_chopSpec());

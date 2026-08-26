@@ -103,6 +103,14 @@ class LiraAudioEngine implements AudioEngine {
 
   RenderSpec? _spec;
 
+  /// Whether [_spec] has been painted since the output went away, and so is
+  /// waiting for it to come back. See [setSpec].
+  bool _specPending = false;
+
+  /// Whether a reopen is already in flight, so a frame callback that notices a
+  /// lost device does not ask for it back sixty times a second.
+  bool _reopening = false;
+
   /// The spec behind each published plan, until the playhead has moved past
   /// it. The engine reports which plan the position it is showing came from,
   /// because during a queued Beat swap that is not the newest spec sent, and a
@@ -118,10 +126,19 @@ class LiraAudioEngine implements AudioEngine {
   /// Scratch for turning the shared struct's `f64::to_bits` back into a double.
   final ByteData _bits = ByteData(8);
 
+  /// Set by the studio, called when the device comes back at a rate the app's
+  /// clips were not decoded for. See [AudioEngine.onSampleRateChanged].
+  @override
+  Future<void> Function()? onSampleRateChanged;
+
   @override
   Future<void> initialize() async {
     if (isInitialized) return;
-    await configureAudioSession(stop);
+    await configureAudioSession(
+      onStop: stop,
+      onSuspend: suspend,
+      onResume: resume,
+    );
 
     final handle = _engine.newEngine(_sampleRate);
     if (handle == nullptr) {
@@ -176,8 +193,18 @@ class LiraAudioEngine implements AudioEngine {
     SpecChange when = SpecChange.now,
   }) async {
     if (!isInitialized) return;
-    final started = Stopwatch()..start();
     _spec = spec;
+    if (!_deviceOpen) {
+      // Painting carries on during a phone call: the app is still on screen,
+      // it is only the output that has gone. Nothing is published into a
+      // closed device, because the plan ring is sized for a thumb against a
+      // running callback and thirty two edits into one nobody is draining
+      // would start pushing the newest out. The spec that is on screen when
+      // the output comes back is the one it gets.
+      _specPending = true;
+      return;
+    }
+    final started = Stopwatch()..start();
     _uploadSources(spec);
 
     final json = utf8.encode(jsonEncode(spec.toEngineJson()));
@@ -192,11 +219,74 @@ class LiraAudioEngine implements AudioEngine {
     // and it is measured on the thread that is doing the waiting.
     _lastCallMicros = started.elapsedMicroseconds;
 
+    _specPending = false;
     _specsByPlan[_engine.lastPlanId(_handle)] = spec;
     if (!_transport.value.playing) {
       _transport.value = _transport.value.copyWith(
         stepCount: spec.beat.stepCount,
       );
+    }
+  }
+
+  /// What the engine says its output is doing, read off the same mapped
+  /// pointer as the playhead. No call, and no engine state mirrored here that
+  /// could disagree with it.
+  int get _deviceState =>
+      _shared == nullptr ? jeDeviceSuspended : _shared.ref.deviceState;
+
+  bool get _deviceOpen => _deviceState == jeDeviceOpen;
+
+  @override
+  Future<void> suspend() async {
+    if (!isInitialized) return;
+    // Stopped here as well as in the engine: the engine stops the transport it
+    // is rendering, and this is the one the grid draws.
+    _ticker?.stop();
+    _check(_engine.suspend(_handle));
+    _transport.value = _transport.value.copyWith(
+      playing: false,
+      step: 0,
+      loopPosition: 0,
+      entryIndex: -1,
+    );
+  }
+
+  @override
+  Future<void> resume() async {
+    if (!isInitialized || _deviceOpen) return;
+    if (_reopening) return;
+    _reopening = true;
+    try {
+      final opened = _engine.resume(_handle);
+      if (opened < 0) {
+        // Not shown to anyone. Whatever still holds the output will let go of
+        // it, and the next interruption ending or the next foreground says so.
+        debugPrint(
+          'junglengine: the output did not come back ($opened) '
+          '${_engine.lastError}',
+        );
+        return;
+      }
+
+      if (opened != _sampleRate) {
+        debugPrint(
+          'junglengine: the device came back at $opened Hz, was $_sampleRate '
+          'Hz, so every clip is resampled again',
+        );
+        _sampleRate = opened;
+        // Whatever is cached over there is at the old rate, and so is whatever
+        // the app is holding. Both get replaced by the reload.
+        _uploadedBreak = null;
+        _uploadedKit = null;
+        _specPending = true;
+        await onSampleRateChanged?.call();
+      }
+
+      // Everything painted while the output was gone, in one publication.
+      final spec = _spec;
+      if (_specPending && spec != null) await setSpec(spec);
+    } finally {
+      _reopening = false;
     }
   }
 
@@ -210,6 +300,15 @@ class LiraAudioEngine implements AudioEngine {
   Future<void> start() async {
     if (!isInitialized || _spec == null) return;
     if (_transport.value.playing) return;
+    // A thumb on the transport is a person saying they expect sound now, so it
+    // is the one place worth reopening a closed output without being told to.
+    // If it still will not open there is nothing to start: the button goes
+    // back to where it was rather than drawing a playhead over silence.
+    if (!_deviceOpen) await resume();
+    if (!_deviceOpen) {
+      debugPrint('junglengine: nothing to play out of, the output is closed');
+      return;
+    }
     _check(_engine.start(_handle));
     _transport.value = _transport.value.copyWith(playing: true);
     (_ticker ??= Ticker(_onFrame)).start();
@@ -230,19 +329,22 @@ class LiraAudioEngine implements AudioEngine {
 
   @override
   Future<void> auditionSlice(int sliceIndex) async {
-    if (!isInitialized) return;
+    // Taps go nowhere while the output is closed rather than queueing up: a
+    // tap is feedback for a finger that has already moved on, and hearing a
+    // handful of them at once when the call ends is worse than hearing none.
+    if (!isInitialized || !_deviceOpen) return;
     _check(_engine.auditionSlice(_handle, sliceIndex));
   }
 
   @override
   Future<void> auditionKitSlot(int slot) async {
-    if (!isInitialized) return;
+    if (!isInitialized || !_deviceOpen) return;
     _check(_engine.auditionKitSlot(_handle, slot));
   }
 
   @override
   Future<void> auditionClip(AudioClip clip, {bool looping = false}) async {
-    if (!isInitialized || clip.frames == 0) return;
+    if (!isInitialized || !_deviceOpen || clip.frames == 0) return;
     final stereo = clip.toStereo();
     _withSamples(stereo.samples, (pointer) {
       _check(
@@ -358,6 +460,23 @@ class LiraAudioEngine implements AudioEngine {
   }
 
   void _onFrame(Duration _) {
+    // A stream that failed under the playhead: the engine has already closed
+    // what was left of it, so there is nothing sounding and nothing to draw.
+    // One attempt to take it back from here, because an output that broke
+    // without an interruption -- media services restarting, a device
+    // disappearing -- has nothing else coming that would say to try.
+    if (_deviceState == jeDeviceLost) {
+      debugPrint('junglengine: the output went away, asking for it back');
+      _ticker?.stop();
+      _transport.value = _transport.value.copyWith(
+        playing: false,
+        step: 0,
+        loopPosition: 0,
+        entryIndex: -1,
+      );
+      unawaited(resume());
+      return;
+    }
     final at = _readShared();
     if (at != null) _transport.value = at;
     _readEditLatency();

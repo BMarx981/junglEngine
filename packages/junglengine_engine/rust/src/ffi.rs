@@ -412,6 +412,64 @@ simple_command!(
     Command::StopAuditionClip
 );
 
+/// Gives the output device back, and stops the transport with it.
+///
+/// What the phone asks for when a call arrives, when another app takes the
+/// output, or when the app goes to the background: holding a device open there
+/// is a battery cost with nothing listening at the end of it. Everything else
+/// is kept -- the loaded plan, the cached break and kit -- so
+/// [`je_engine_resume`] carries on rather than reloads.
+///
+/// Idempotent. Suspending a suspended engine is a no-op, not an error.
+///
+/// # Safety
+/// `handle` must come from [`je_engine_new`].
+#[no_mangle]
+pub unsafe extern "C" fn je_engine_suspend(handle: *mut EngineHandle) -> i32 {
+    guard(JE_ERR_PANIC, || {
+        let Some(handle) = (unsafe { handle.as_mut() }) else {
+            set_error("junglengine: null engine");
+            return JE_ERR_NULL;
+        };
+        match handle.engine.suspend() {
+            Ok(()) => JE_OK,
+            Err(error) => {
+                set_error(format!("junglengine: {error}"));
+                JE_ERR_ENGINE
+            }
+        }
+    })
+}
+
+/// Takes the output device again, and returns the rate it opened at this time.
+/// Negative on a device that will not open, with the reason on
+/// [`je_last_error`]; the caller tries again the next time the platform says
+/// the output is available.
+///
+/// The rate is returned rather than assumed because a phone can come back on a
+/// different route than it went away on. When it has moved, everything the app
+/// decoded is at the wrong rate: it resamples and republishes, and the
+/// transport stays stopped until it does.
+///
+/// # Safety
+/// `handle` must come from [`je_engine_new`].
+#[no_mangle]
+pub unsafe extern "C" fn je_engine_resume(handle: *mut EngineHandle) -> i32 {
+    guard(JE_ERR_PANIC, || {
+        let Some(handle) = (unsafe { handle.as_mut() }) else {
+            set_error("junglengine: null engine");
+            return JE_ERR_NULL;
+        };
+        match handle.engine.resume() {
+            Ok(rate) => rate as i32,
+            Err(error) => {
+                set_error(format!("junglengine: {error}"));
+                JE_ERR_ENGINE
+            }
+        }
+    })
+}
+
 /// Plays one slice of the current break immediately, for tap feedback. Never
 /// affects the transport.
 ///

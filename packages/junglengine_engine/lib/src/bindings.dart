@@ -57,10 +57,27 @@ final class JeTransport extends Struct {
   /// looks the id up against the spec that plan was built from.
   @Int32()
   external int section;
+
+  /// What the output device is doing: [jeDeviceOpen], [jeDeviceSuspended] or
+  /// [jeDeviceLost]. The one field here the audio callback does not write, and
+  /// so the one that is read on its own rather than through [version].
+  @Uint32()
+  external int deviceState;
 }
 
 /// Success. Anything negative is a failure whose reason is on [JeBindings.lastError].
 const int jeOk = 0;
+
+/// The output is open and the callback is running.
+const int jeDeviceOpen = 0;
+
+/// The device was handed back on purpose, by [JeBindings.suspend].
+const int jeDeviceSuspended = 1;
+
+/// The stream failed underneath the engine: a call arriving, a route change,
+/// media services restarting. The engine has closed what was left of it and is
+/// waiting to be told to try again.
+const int jeDeviceLost = 2;
 
 typedef JeNewNative = Pointer<Void> Function(Uint32);
 typedef JeNewDart = Pointer<Void> Function(int);
@@ -154,6 +171,12 @@ class JeBindings {
       stop = library.lookupFunction<JeIntHandleNative, JeIntHandleDart>(
         'je_engine_stop',
       ),
+      suspend = library.lookupFunction<JeIntHandleNative, JeIntHandleDart>(
+        'je_engine_suspend',
+      ),
+      resume = library.lookupFunction<JeIntHandleNative, JeIntHandleDart>(
+        'je_engine_resume',
+      ),
       auditionSlice = library
           .lookupFunction<JeAuditionIndexNative, JeAuditionIndexDart>(
             'je_engine_audition_slice',
@@ -192,6 +215,13 @@ class JeBindings {
   final JeIntHandleDart cancelQueuedSpec;
   final JeIntHandleDart start;
   final JeIntHandleDart stop;
+
+  /// Closes the output and stops the transport, keeping everything else.
+  final JeIntHandleDart suspend;
+
+  /// Opens the output again. Returns the rate it opened at, which a phone is
+  /// free to have changed while the device was closed, or a negative code.
+  final JeIntHandleDart resume;
   final JeAuditionIndexDart auditionSlice;
   final JeAuditionIndexDart auditionKitSlot;
   final JeAuditionClipDart auditionClip;

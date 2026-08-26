@@ -8,6 +8,9 @@
 //! ring, the renderer and the device all working together, which is a good
 //! deal more than a sine proves.
 //!
+//! It also runs stage 5's leg: the device given back and taken again, which
+//! is a thing a phone does constantly and a desk never does.
+//!
 //! On macOS this runs from a terminal. On a phone the app itself is this test:
 //! `LiraAudioEngine` is the same path with Dart on the other end of the FFI.
 
@@ -31,7 +34,7 @@ fn main() {
     let spec = Spec::from_json_str(&spec_json()).expect("the fixture spec should parse");
     let plan = Plan::new(1, spec, Sources::new(break_clip, Vec::new()));
 
-    let engine = match Engine::new(RATE, plan) {
+    let mut engine = match Engine::new(RATE, plan) {
         Ok(engine) => engine,
         Err(error) => {
             eprintln!("je_device: could not open the output: {error}");
@@ -54,11 +57,29 @@ fn main() {
         .expect("engine is running");
     std::thread::sleep(Duration::from_secs(1));
 
-    let transport = engine.transport();
+    let transport = std::sync::Arc::clone(engine.transport());
     println!(
         "je_device: {} frames rendered, step {}",
         transport.frame.load(std::sync::atomic::Ordering::Relaxed),
         transport.step.load(std::sync::atomic::Ordering::Relaxed),
+    );
+
+    // Stage 5's question, which a phone asks constantly and a desk never does:
+    // give the device back, take it again, and carry on with the plan that was
+    // already loaded. Audible as a gap and then the same pattern, from the top
+    // -- a suspend stops the transport, because one that was running when the
+    // output went away must not be running when it comes back.
+    engine.suspend().expect("the device gives up cleanly");
+    println!("je_device: suspended, output closed");
+    std::thread::sleep(Duration::from_secs(1));
+
+    let before = transport.frame.load(std::sync::atomic::Ordering::Relaxed);
+    let rate = engine.resume().expect("the device comes back");
+    engine.command(Command::Start).expect("engine is running");
+    std::thread::sleep(Duration::from_secs(2));
+    println!(
+        "je_device: resumed at {rate} Hz, {} frames since",
+        transport.frame.load(std::sync::atomic::Ordering::Relaxed) - before,
     );
 
     engine.command(Command::Stop).expect("engine is running");
