@@ -136,7 +136,9 @@ Future<ImportCandidate> decodeImportedPath(
     throw ImportException(ImportFailure.decode, detail: error.message);
   }
 
-  final clip = decoded.clip.toStereo().resampledTo(sampleRate);
+  // Off the UI isolate: the file can be three minutes long and the band
+  // limited resampler is sixty four taps a frame. See `resample.dart`.
+  final clip = await decoded.clip.toStereo().resampledToOffThread(sampleRate);
   if (clip.frames < _minimumFrames) {
     throw ImportException(ImportFailure.tooShort);
   }

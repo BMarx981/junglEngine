@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:junglengine/audio/resample.dart';
+
 /// Decoded audio held as interleaved 32 bit float, which is the only shape the
 /// mixer and the exporter ever deal with.
 class AudioClip {
@@ -39,25 +41,38 @@ class AudioClip {
     return AudioClip(samples: out, channels: 2, sampleRate: sampleRate);
   }
 
-  /// Linear resample. Only ever runs when a bundled break is not already at the
-  /// engine rate, so quality here is not on the critical path.
+  /// Resamples to [rate], band limited. See `resample.dart`: this is on the
+  /// load path for every clip under the Lira engine, because a phone runs the
+  /// output at whatever rate it likes and the app follows it.
   AudioClip resampledTo(int rate) {
     if (rate == sampleRate) return this;
-    final ratio = sampleRate / rate;
-    final outFrames = (frames / ratio).floor();
-    final out = Float32List(outFrames * channels);
-    for (var f = 0; f < outFrames; f++) {
-      final src = f * ratio;
-      final i0 = src.floor();
-      final i1 = i0 + 1 < frames ? i0 + 1 : i0;
-      final t = src - i0;
-      for (var c = 0; c < channels; c++) {
-        final a = samples[i0 * channels + c];
-        final b = samples[i1 * channels + c];
-        out[f * channels + c] = a + (b - a) * t;
-      }
-    }
-    return AudioClip(samples: out, channels: channels, sampleRate: rate);
+    return AudioClip(
+      samples: resampleInterleaved(
+        samples,
+        channels: channels,
+        inRate: sampleRate,
+        outRate: rate,
+      ),
+      channels: channels,
+      sampleRate: rate,
+    );
+  }
+
+  /// The same conversion, on another isolate. For an import, which can be
+  /// three minutes long; a bundled clip is seconds long and uses the one
+  /// above.
+  Future<AudioClip> resampledToOffThread(int rate) async {
+    if (rate == sampleRate) return this;
+    return AudioClip(
+      samples: await resampleInterleavedOffThread(
+        samples,
+        channels: channels,
+        inRate: sampleRate,
+        outRate: rate,
+      ),
+      channels: channels,
+      sampleRate: rate,
+    );
   }
 
   /// Peak normalise to [target]. Bundled breaks arrive at wildly different

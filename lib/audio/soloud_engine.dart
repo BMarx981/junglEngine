@@ -599,8 +599,15 @@ void _renderRun(
 
 /// Loads and prepares a bundled break for the mixer: stereo, at the engine
 /// rate, peak normalised.
+///
+/// The resampling goes to another isolate, because switching break is an
+/// interaction a person watches and on a device that does not run at 44100
+/// this is the expensive part of the switch. On a device that does, and that
+/// is every bundled asset's own rate, there is nothing to resample and nothing
+/// is spawned. See `resample.dart`.
 Future<AudioClip> loadBreakClip(Uint8List bytes, int sampleRate) async {
-  return decodeWav(bytes).toStereo().resampledTo(sampleRate).normalized();
+  final decoded = decodeWav(bytes).toStereo();
+  return (await decoded.resampledToOffThread(sampleRate)).normalized();
 }
 
 /// Loads a bundled one shot: stereo, at the engine rate, left at the level it
