@@ -66,6 +66,46 @@ class TransportState {
       Object.hash(playing, step, stepCount, loopPosition, beatId, entryIndex);
 }
 
+/// One edit-to-audible measurement: painting a step, to hearing it.
+///
+/// The number the M4 gate is answered on. Both engines report it the same way
+/// so the two can be compared, and both count the same stretch: from the edit
+/// being handed to the engine, to the first sample of it being handed to the
+/// platform.
+///
+/// What each of them is measuring underneath is not the same thing at all, and
+/// that is the point. The Lira engine is measuring a wait for the next block
+/// boundary. flutter_soloud is measuring the queue it keeps ahead of the
+/// playhead, because everything already pushed to the device carries the old
+/// pattern.
+///
+/// Neither can see what the speaker does after the platform has the samples,
+/// which is a buffer of the same order on both and is why stage 3 also puts a
+/// 240 fps camera on a thumb. This comes back out of the interface when the
+/// gate is answered and one of the two engines goes away. See docs/M4.md.
+@immutable
+class EditLatency {
+  const EditLatency({required this.engineMicros, required this.callMicros});
+
+  /// Microseconds between the engine being handed the edit and the first
+  /// sample of it reaching the platform.
+  final int engineMicros;
+
+  /// What the [AudioEngine.setSpec] call itself cost on the UI thread. Part of
+  /// the wait between the paint and the sound, and the part that is Dart's
+  /// rather than the engine's: encoding a spec, and on the Lira engine copying
+  /// it across the boundary.
+  final int callMicros;
+
+  /// The whole wait, as far as the engine can see it.
+  Duration get total => Duration(microseconds: callMicros + engineMicros);
+
+  @override
+  String toString() =>
+      'EditLatency(${total.inMicroseconds / 1000} ms: engine '
+      '${engineMicros / 1000} ms, call ${callMicros / 1000} ms)';
+}
+
 /// When a new [RenderSpec] takes over.
 enum SpecChange {
   /// As soon as the engine can, without interrupting anything that is ringing.
@@ -92,6 +132,11 @@ abstract class AudioEngine {
 
   /// The playhead. Rebuild against this, do not poll.
   ValueListenable<TransportState> get transport;
+
+  /// The most recent edit-to-audible measurement, or null before an edit has
+  /// been made while the transport is running. Only the M4 readout listens to
+  /// this; nothing in the app's own behaviour depends on it.
+  ValueListenable<EditLatency?> get editLatency;
 
   Future<void> initialize();
 

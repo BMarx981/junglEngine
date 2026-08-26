@@ -57,9 +57,22 @@ const int engineSampleRate = int.fromEnvironment(
   defaultValue: 44100,
 );
 
+/// Whether to show the M4 readout over the app: what an edit costs, in
+/// milliseconds, taken on the device rather than on a desk.
+///
+/// `--dart-define=JE_LATENCY_HUD=true`. A measurement instrument and not a
+/// screen: it is untranslated on purpose, it is never in a build nobody asked
+/// for it in, and it goes when the gate is answered. See docs/M4.md.
+const bool showLatencyHud = bool.fromEnvironment('JE_LATENCY_HUD');
+
 /// The one engine instance for the app.
+///
+/// The flag is a request rather than a promise, the same way the sample rate
+/// is: a device whose loader will not take the crate at all -- Android below
+/// API 26, where `libaaudio.so` does not exist yet -- gets flutter_soloud and
+/// a line in the log, not silence.
 final audioEngineProvider = Provider<AudioEngine>((ref) {
-  final AudioEngine engine = useLiraEngine
+  final AudioEngine engine = useLiraEngine && LiraAudioEngine.isAvailable
       ? LiraAudioEngine(requestedRate: engineSampleRate)
       : SoLoudAudioEngine(sampleRate: engineSampleRate);
   ref.onDispose(() => unawaited(engine.shutdown()));

@@ -19,6 +19,7 @@ use std::cell::RefCell;
 use std::ffi::{c_char, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
+use std::time::Instant;
 
 use crate::command::{Command, When};
 use crate::device::Engine;
@@ -254,7 +255,11 @@ pub unsafe extern "C" fn je_engine_set_spec(
         };
         let sources = handle.sources();
         let id = handle.engine.next_plan_id();
-        let plan = Plan::new(id, spec, sources);
+        let mut plan = Plan::new(id, spec, sources);
+        // Stamped here, on the caller's thread, rather than on the control
+        // thread: what stage 3 is measuring is the delay the app's thumb sees,
+        // and the hop to the control thread is part of it.
+        plan.published_at = Some(Instant::now());
         match handle.engine.publish(plan, When::from_code(when)) {
             Ok(()) => JE_OK,
             Err(error) => {

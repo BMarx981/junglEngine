@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:junglengine/features/debug/latency_hud.dart';
 import 'package:junglengine/features/import/incoming_files.dart';
 import 'package:junglengine/features/studio_screen.dart';
 import 'package:junglengine/l10n/l10n.dart';
@@ -62,7 +63,10 @@ class _JungleAppState extends ConsumerState<JungleApp>
       // joining, and CJK does not want the tracking either.
       builder: (context, child) => Theme(
         data: JungleTheme.build(Localizations.localeOf(context)),
-        child: child!,
+        // Here rather than in the studio so the M4 readout is over everything,
+        // the loading and failed screens included, and only when the define
+        // asks for it. See docs/M4.md.
+        child: withLatencyHud(child!),
       ),
       // Wrapped rather than built in, because taking in a file that another app
       // handed over needs a Navigator and a lifecycle, not anything the studio

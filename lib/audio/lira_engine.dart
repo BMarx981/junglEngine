@@ -34,6 +34,29 @@ class LiraAudioEngine implements AudioEngine {
   /// behind [sampleRate] is not final.
   LiraAudioEngine({int requestedRate = 44100}) : _sampleRate = requestedRate;
 
+  /// Whether the compiled engine is in this process at all.
+  ///
+  /// It is not, on Android below API 26: the crate links `libaaudio.so`, which
+  /// arrives in Android 8.0, so on 7 the loader refuses the whole shared
+  /// object. That is a device this app still runs on, and the answer there is
+  /// flutter_soloud rather than silence -- so the flag is a request like the
+  /// sample rate is, and this is what answers it. See docs/M4.md.
+  ///
+  /// Cheap enough to call on the way to building the engine: the library is
+  /// opened once and held by the process afterwards.
+  static bool get isAvailable {
+    try {
+      engineBindings;
+      return true;
+    } on Object catch (error) {
+      debugPrint(
+        'junglengine: the Lira engine will not load here, staying on '
+        'flutter_soloud ($error)',
+      );
+      return false;
+    }
+  }
+
   int _sampleRate;
 
   /// The rate the device actually opened at, which a phone decides rather than
@@ -51,6 +74,22 @@ class LiraAudioEngine implements AudioEngine {
 
   @override
   ValueListenable<TransportState> get transport => _transport;
+
+  final ValueNotifier<EditLatency?> _editLatency = ValueNotifier(null);
+
+  @override
+  ValueListenable<EditLatency?> get editLatency => _editLatency;
+
+  /// The last measurement the callback published, so a republished count is
+  /// not read as a new edit.
+  int _editSeq = 0;
+
+  /// What the last [setSpec] cost on the UI thread, carried across to the
+  /// measurement the engine reports for it. The two halves are taken on
+  /// different threads and there is no ticket between them, so a burst of
+  /// edits inside one block pairs the newest call with the newest landing.
+  /// Over a run of taps that is the same distribution.
+  int _lastCallMicros = 0;
 
   late final JeBindings _engine = engineBindings;
 
@@ -124,6 +163,8 @@ class LiraAudioEngine implements AudioEngine {
     _handle = nullptr;
     _shared = nullptr;
     _specsByPlan.clear();
+    // A new engine counts its measurements from zero, so this has to as well.
+    _editSeq = 0;
     if (handle != nullptr) _engine.freeEngine(handle);
     // _transport is deliberately not disposed: it lives as long as the app and
     // painters hold it as their repaint source.
@@ -135,6 +176,7 @@ class LiraAudioEngine implements AudioEngine {
     SpecChange when = SpecChange.now,
   }) async {
     if (!isInitialized) return;
+    final started = Stopwatch()..start();
     _spec = spec;
     _uploadSources(spec);
 
@@ -146,6 +188,9 @@ class LiraAudioEngine implements AudioEngine {
     } finally {
       malloc.free(buffer);
     }
+    // Encoding the spec and copying it across is the app's half of the wait,
+    // and it is measured on the thread that is doing the waiting.
+    _lastCallMicros = started.elapsedMicroseconds;
 
     _specsByPlan[_engine.lastPlanId(_handle)] = spec;
     if (!_transport.value.playing) {
@@ -315,6 +360,29 @@ class LiraAudioEngine implements AudioEngine {
   void _onFrame(Duration _) {
     final at = _readShared();
     if (at != null) _transport.value = at;
+    _readEditLatency();
+  }
+
+  /// Picks up an edit-to-audible measurement the callback left behind.
+  ///
+  /// Read on the frame callback with the playhead, because that is where the
+  /// pointer is already being touched and a measurement that is one frame old
+  /// is still the same measurement. The count is written after the latency, so
+  /// reading the count, then the latency, then the count again is enough: a
+  /// count that did not move means the latency underneath it did not either.
+  void _readEditLatency() {
+    if (_shared == nullptr) return;
+    final shared = _shared.ref;
+    final seq = shared.editSeq;
+    if (seq == _editSeq) return;
+    final micros = shared.editLatencyMicros;
+    if (shared.editSeq != seq) return;
+
+    _editSeq = seq;
+    _editLatency.value = EditLatency(
+      engineMicros: micros,
+      callMicros: _lastCallMicros,
+    );
   }
 
   /// Reads the shared struct without a lock.

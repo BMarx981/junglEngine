@@ -65,6 +65,11 @@ class SoLoudAudioEngine implements AudioEngine {
   @override
   ValueListenable<TransportState> get transport => _transport;
 
+  final ValueNotifier<EditLatency?> _editLatency = ValueNotifier(null);
+
+  @override
+  ValueListenable<EditLatency?> get editLatency => _editLatency;
+
   @override
   bool get isInitialized => _initialized;
 
@@ -150,6 +155,7 @@ class SoLoudAudioEngine implements AudioEngine {
     RenderSpec spec, {
     SpecChange when = SpecChange.now,
   }) async {
+    final started = Stopwatch()..start();
     final playing = _transport.value.playing;
     if (when == SpecChange.nextBar &&
         playing &&
@@ -181,6 +187,7 @@ class SoLoudAudioEngine implements AudioEngine {
       // repeat count or dragging the tempo never restarts the bar or cuts a
       // ringing slice.
       renderer.updateSpec(spec);
+      if (wasPlaying) _noteEdit(started.elapsedMicroseconds);
     }
 
     _transport.value = _transport.value.copyWith(
@@ -188,6 +195,34 @@ class SoLoudAudioEngine implements AudioEngine {
     );
     unawaited(_ensureSliceSources());
     unawaited(_ensureKitSources());
+  }
+
+  /// Records how long the edit that has just been made will take to become
+  /// audible.
+  ///
+  /// Every frame already pushed to the device carries the old pattern, so the
+  /// new one is first heard when the device has consumed all of them. That is
+  /// the queue depth, and it is the number [_queueSeconds] is: the reason this
+  /// engine holds a quarter of a second is that the mixer runs on the event
+  /// loop, and an event loop that stalls for a GC or a rebuilding widget tree
+  /// must not be able to starve the device.
+  ///
+  /// Read from the device's own consumed count rather than assumed to be
+  /// [_queueFrames], because the feeder tops up on a 12 ms timer and what is
+  /// actually queued at the moment of a tap is wherever that timer left it.
+  void _noteEdit(int callMicros) {
+    final stream = _stream;
+    if (stream == null) return;
+    try {
+      final queued = _framesPushed - _consumedFrames(stream);
+      _editLatency.value = EditLatency(
+        engineMicros: queued <= 0 ? 0 : (queued * 1000000 / sampleRate).round(),
+        callMicros: callMicros,
+      );
+    } on SoLoudException {
+      // The stream went away mid edit. The tick handles that; a missing
+      // measurement is not worth a second path for it.
+    }
   }
 
   @override

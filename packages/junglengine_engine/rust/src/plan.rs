@@ -10,6 +10,7 @@
 //! graph is four slice voices, sixteen kit voices and one sub.
 
 use std::sync::Arc;
+use std::time::Instant;
 
 use crate::spec::{Spec, STEPS_PER_BAR};
 
@@ -171,6 +172,22 @@ pub struct Plan {
     /// reading belongs to -- during a queued Beat swap that is not the newest
     /// spec it sent.
     pub id: u64,
+
+    /// When this plan was handed over, stamped on the caller's thread by
+    /// [`crate::ffi::je_engine_set_spec`]. The callback subtracts it from the
+    /// clock the moment the plan first renders, and that difference is the
+    /// edit-to-audible number stage 3 is about.
+    ///
+    /// A clock rather than the callback's frame counter, which is the obvious
+    /// thing and the wrong one: the counter only moves when a block is
+    /// rendered, so an edit published between two callbacks and picked up by
+    /// the next one would measure zero frames while a real fraction of a block
+    /// went by. What is being measured is a wait, and a wait is time.
+    ///
+    /// `None` on a plan nobody published: the silent one the engine opens
+    /// with, and the ones export builds.
+    pub published_at: Option<Instant>,
+
     pub spec: Spec,
     pub sources: Sources,
     pub timeline: Timeline,
@@ -181,6 +198,7 @@ impl Plan {
         let timeline = Timeline::new(&spec);
         Box::new(Plan {
             id,
+            published_at: None,
             spec,
             sources,
             timeline,

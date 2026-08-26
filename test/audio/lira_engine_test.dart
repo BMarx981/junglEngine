@@ -140,6 +140,50 @@ void main() {
       await tester.pump();
     });
 
+    testWidgets('says how long an edit took to become audible', (tester) async {
+      await tester.runAsync(() async {
+        await engine.setSpec(_chopSpec());
+        await engine.start();
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pump();
+      expect(
+        engine.editLatency.value,
+        isNull,
+        reason: 'nothing has been edited yet',
+      );
+
+      await tester.runAsync(() async {
+        // The same Beat with a step moved: adopted under the playhead, which
+        // is the path a painted step takes and the one stage 3 measures.
+        await engine.setSpec(_editedChopSpec());
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pump();
+
+      final measured = engine.editLatency.value;
+      expect(measured, isNotNull);
+      // A wait, not a frame count: an edit that arrives between two callbacks
+      // and is picked up by the next one waited a real fraction of a block,
+      // and the callback's frame counter cannot see that.
+      expect(measured!.engineMicros, greaterThan(0));
+
+      // The mixer is the callback, so the edit waits for a block boundary and
+      // nothing else. A generous ceiling: a laptop under a test run is not the
+      // phone the gate is answered on, and what is being checked here is that
+      // the number is real rather than what it comes to.
+      expect(
+        measured.total,
+        lessThan(const Duration(milliseconds: 120)),
+        reason:
+            'an adopted edit should land within a block or two, got '
+            '$measured',
+      );
+
+      await tester.runAsync(() => engine.stop());
+      await tester.pump();
+    });
+
     testWidgets('shuts down cleanly while it is still playing', (tester) async {
       await tester.runAsync(() async {
         await engine.setSpec(_chopSpec());
@@ -232,6 +276,21 @@ RenderSpec _chopSpec() => RenderSpec(
   bpm: bpm,
   sampleRate: rate,
 );
+
+/// The same Beat with one step moved: an edit, and not a Beat change. Same id,
+/// same step count, same machine and the same break buffer, which is exactly
+/// what the renderer asks before it swaps a plan in under the playhead.
+RenderSpec _editedChopSpec() {
+  final spec = _chopSpec();
+  final steps = List<ChopStep?>.of(spec.beat.chop.steps);
+  steps[2] = const ChopStep(9);
+  return RenderSpec(
+    breakClip: spec.breakClip,
+    beat: spec.beat.copyWith(chop: ChopPattern(steps)),
+    bpm: bpm,
+    sampleRate: rate,
+  );
+}
 
 RenderSpec _kitSpec() => RenderSpec(
   breakClip: _theBreak,

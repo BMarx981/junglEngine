@@ -49,7 +49,9 @@ And the device, which is what stage 2 added:
 - `rust/src/preview.rs` — the audition voice. One tap, one voice reading a
   range of audio that is already there.
 - `rust/src/transport.rs` — the playhead, as a `#[repr(C)]` struct of atomics
-  Dart maps once and reads without a call.
+  Dart maps once and reads without a call. It also carries the M4 edit-to-
+  audible measurement, which is one more thing the callback leaves behind
+  rather than one more call.
 - `rust/src/ffi.rs` — the C ABI, and the whole of it. Eighteen entry points,
   one per method on `AudioEngine` plus the transport and the last error. If a
   function here has no counterpart on that interface, it does not belong.

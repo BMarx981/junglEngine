@@ -27,12 +27,23 @@ pub struct TransportShared {
     /// against *this* plan, not against whatever it published last.
     pub plan_id: AtomicU64,
 
-    /// Frames the callback has produced since the stream opened. Monotonic,
-    /// and the clock the edit-to-audible measurement in stage 3 is taken on.
+    /// Frames the callback has produced since the stream opened. Monotonic.
     pub frame: AtomicU64,
 
     /// Position through the current pass, 0..1, as `f64::to_bits`.
     pub position_bits: AtomicU64,
+
+    /// Edits that have become audible. Bumped by the callback the moment a
+    /// published plan first renders a sample, so the Dart side can tell one
+    /// measurement from the next without a call.
+    pub edit_seq: AtomicU64,
+
+    /// Microseconds between the edit being published and the callback that
+    /// first rendered it, which is stage 3's whole question. Read with
+    /// [`edit_seq`] either side of it.
+    ///
+    /// [`edit_seq`]: TransportShared::edit_seq
+    pub edit_latency_micros: AtomicU64,
 
     /// Bumped to odd before a write and back to even after it, so a reader
     /// that sees the same even value either side of its read knows the fields
@@ -60,6 +71,8 @@ impl Default for TransportShared {
             plan_id: AtomicU64::new(0),
             frame: AtomicU64::new(0),
             position_bits: AtomicU64::new(0),
+            edit_seq: AtomicU64::new(0),
+            edit_latency_micros: AtomicU64::new(0),
             version: AtomicU32::new(0),
             playing: AtomicU32::new(0),
             step: AtomicI32::new(0),
@@ -101,6 +114,26 @@ impl TransportShared {
         self.version.store(version.wrapping_add(2), Ordering::Relaxed);
     }
 
+    /// Records one edit-to-audible measurement: the time between a plan being
+    /// published and the block that first sounds it.
+    ///
+    /// Its own tiny seqlock rather than a field of [`TransportShared::publish`],
+    /// because an edit happens when a thumb moves and a publication happens
+    /// every block: pairing them would mean either republishing a stale
+    /// measurement sixty times a second or losing one that landed between
+    /// blocks. Latency first, then the counter, so a reader that sees a new
+    /// count is looking at the measurement that belongs to it.
+    ///
+    /// The clock stops at the callback, which is where the engine's knowledge
+    /// stops: what the device does with the block afterwards is a buffer
+    /// neither engine can see, and it is what the camera in stage 3 is for.
+    pub fn note_edit(&self, latency_micros: u64) {
+        self.edit_latency_micros
+            .store(latency_micros, Ordering::Relaxed);
+        std::sync::atomic::fence(Ordering::Release);
+        self.edit_seq.fetch_add(1, Ordering::Relaxed);
+    }
+
     /// Marks the transport stopped without disturbing the position, so the
     /// grid keeps drawing the step the playhead came to rest on.
     pub fn set_playing(&self, playing: bool) {
@@ -122,8 +155,22 @@ mod tests {
     /// sequencer rather than in the wire format.
     #[test]
     fn the_shared_layout_is_what_dart_maps() {
-        assert_eq!(std::mem::size_of::<TransportShared>(), 48);
+        assert_eq!(std::mem::size_of::<TransportShared>(), 64);
         assert_eq!(std::mem::align_of::<TransportShared>(), 8);
+    }
+
+    #[test]
+    fn an_edit_measurement_arrives_with_its_own_count() {
+        let shared = TransportShared::default();
+        assert_eq!(shared.edit_seq.load(Ordering::Relaxed), 0);
+
+        shared.note_edit(512);
+        assert_eq!(shared.edit_seq.load(Ordering::Relaxed), 1);
+        assert_eq!(shared.edit_latency_micros.load(Ordering::Relaxed), 512);
+
+        shared.note_edit(1024);
+        assert_eq!(shared.edit_seq.load(Ordering::Relaxed), 2);
+        assert_eq!(shared.edit_latency_micros.load(Ordering::Relaxed), 1024);
     }
 
     #[test]

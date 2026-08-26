@@ -10,8 +10,11 @@ import 'package:junglengine/audio/soloud_engine.dart';
 /// It implements the interface exactly, which is also a check that the seam is
 /// narrow enough for the Lira engine to sit behind later.
 class FakeAudioEngine implements AudioEngine {
+  /// Not final, because a real engine's is not: the Lira engine is told its
+  /// rate by the device on open, which is after everything holding it has
+  /// already been built once.
   @override
-  final int sampleRate = 44100;
+  int sampleRate = 44100;
 
   @override
   bool isInitialized = false;
@@ -22,6 +25,14 @@ class FakeAudioEngine implements AudioEngine {
 
   @override
   ValueListenable<TransportState> get transport => _transport;
+
+  final ValueNotifier<EditLatency?> _editLatency = ValueNotifier(null);
+
+  /// Nothing in the app reads this: it is the M4 readout's source and the
+  /// readout is only in a build that asked for it. Here so the fake still
+  /// implements the interface exactly.
+  @override
+  ValueListenable<EditLatency?> get editLatency => _editLatency;
 
   RenderSpec? lastSpec;
 
@@ -43,6 +54,7 @@ class FakeAudioEngine implements AudioEngine {
   Future<void> shutdown() async {
     isInitialized = false;
     _transport.dispose();
+    _editLatency.dispose();
   }
 
   @override
@@ -123,6 +135,15 @@ class FakeAudioEngine implements AudioEngine {
 
   @override
   int loopFramesFor(RenderSpec spec) => PatternRenderer(spec).loopFrames;
+
+  /// Reports an edit-to-audible measurement, the way a real engine does once
+  /// the edit is actually sounding.
+  void noteEdit({required int engineMicros, int callMicros = 0}) {
+    _editLatency.value = EditLatency(
+      engineMicros: engineMicros,
+      callMicros: callMicros,
+    );
+  }
 
   /// Moves the fake playhead, for testing anything that draws it.
   void moveTo(int step, double loopPosition) {

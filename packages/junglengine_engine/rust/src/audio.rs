@@ -13,6 +13,7 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 
 use rtrb::{Consumer, Producer};
 
@@ -39,9 +40,9 @@ pub struct AudioSide {
 
     transport: Arc<TransportShared>,
 
-    /// Frames the callback has produced since the stream opened. Shared so the
-    /// control thread can stamp the frame an edit was published on, which is
-    /// the "edit" half of stage 3's edit-to-audible measurement.
+    /// Frames the callback has produced since the stream opened. Shared with
+    /// the control side, which is what makes it the stream's own clock rather
+    /// than one this struct keeps to itself.
     frame: Arc<AtomicU64>,
 
     playing: bool,
@@ -156,6 +157,11 @@ impl AudioSide {
                 // Swapped in under the running playhead, so painting a step,
                 // nudging a repeat count or dragging the tempo never restarts
                 // the bar or cuts a ringing slice.
+                //
+                // This is the path a painted step takes, so this is the path
+                // stage 3 measures. Taken before the plan moves, and before
+                // the block it will sound in is rendered.
+                self.note_edit(plan.published_at);
                 self.renderer.adopt(plan)
             } else {
                 // A different Beat, a different machine or a different break:
@@ -166,6 +172,31 @@ impl AudioSide {
             };
             self.bin(Some(retired));
         }
+    }
+
+    /// Reports how long an edit took to reach the callback: the time between
+    /// the publication being stamped on the caller's thread and the block that
+    /// is about to render it.
+    ///
+    /// Only while playing, and only for a plan swapped in under the playhead:
+    /// that is the path a painted step takes. A queued Beat waits for a bar
+    /// line on purpose and a Beat that cannot be adopted restarts the pattern,
+    /// and neither of those is an edit. See docs/M4.md.
+    ///
+    /// The clock read is the one thing in this file that is not obviously
+    /// allowed here. It is `clock_gettime` through the vDSO on both phone
+    /// platforms -- no allocation, no lock, no syscall -- and it happens on
+    /// the blocks that carry an edit rather than on every block, which is a
+    /// handful of times while a thumb is moving.
+    fn note_edit(&self, published_at: Option<Instant>) {
+        let Some(published_at) = published_at else {
+            return;
+        };
+        if !self.playing {
+            return;
+        }
+        let waited = Instant::now().saturating_duration_since(published_at);
+        self.transport.note_edit(waited.as_micros() as u64);
     }
 
     fn audition_slice(&mut self, index: i32) {

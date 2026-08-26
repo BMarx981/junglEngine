@@ -24,6 +24,17 @@ final class JeTransport extends Struct {
   @Uint64()
   external int positionBits;
 
+  /// Edits that have become audible. Bumped once per measurement, so a reader
+  /// can tell a new one from the last without a call and without a timestamp.
+  @Uint64()
+  external int editSeq;
+
+  /// Microseconds between the last edit being published and the callback that
+  /// rendered it. Read [editSeq] either side of this: the pair is written
+  /// latency first, count second.
+  @Uint64()
+  external int editLatencyMicros;
+
   /// Odd while the audio thread is writing. Read either side of the fields and
   /// retry if it moved: one writer, so this half of the seqlock never waits.
   @Uint32()
