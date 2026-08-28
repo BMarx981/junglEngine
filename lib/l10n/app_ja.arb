@@ -119,7 +119,7 @@
   "proFeatureMidiDetail": "ビートのMIDIファイルと鳴っているサンプル。KongやNN-XTにそのまま放り込める並びで書き出します。",
   "proFeaturePacksTitle": "スライスパック",
   "proFeaturePacksDetail": "このために作ったブレイクとキットを、出るたびに。",
-  "proFreeBundled": "収録のブレイクとキットすべて",
+  "proFreeBundled": "Starter パックの中身すべて",
   "proFreeMachines": "両方のマシン、グリッド全体、subレーン",
   "proFreeSongs": "ソングとWAV書き出し",
   "proFreeNoAds": "広告は一切なし"

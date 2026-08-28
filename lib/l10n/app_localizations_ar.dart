@@ -393,7 +393,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get proFeaturePacksDetail => 'بريكات وأطقم مصنوعة لهذا، كلّما صدرت.';
 
   @override
-  String get proFreeBundled => 'كل البريكات والأطقم المضمّنة';
+  String get proFreeBundled => 'كل ما في حزمة Starter';
 
   @override
   String get proFreeMachines => 'كلتا الآلتين، والشبكة بأكملها، ومسار sub';

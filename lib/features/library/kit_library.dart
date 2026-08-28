@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import 'package:junglengine/audio/audio_clip.dart';
 import 'package:junglengine/audio/soloud_engine.dart';
+import 'package:junglengine/features/library/pack.dart';
 import 'package:junglengine/models/kit_ref.dart';
 
 /// The bundled one shot kits.
@@ -11,91 +12,20 @@ import 'package:junglengine/models/kit_ref.dart';
 /// One kit per project, positional: slot *n* plays sample *n*. Eight slots is
 /// the ceiling, so a kit here is exactly eight samples.
 ///
-/// Anything added here needs a line in LICENSING.md before a store build.
+/// Flattened out of [PackLibrary.all] for the same reason [BreakLibrary] is:
+/// content is registered in a pack, and everything below this line goes on
+/// treating a kit as eight samples in order.
+///
+/// Anything added to a pack needs a line in LICENSING.md before a store build.
 class KitLibrary {
   const KitLibrary._();
 
-  static const List<KitRef> bundled = [
-    KitRef(
-      id: 'hawkstreak-01',
-      name: 'Hawkstreak 01',
-      credit: 'Hawkstreak, synthesised original. See LICENSING.md.',
-      samples: [
-        KitSampleRef(
-          label: 'KICK',
-          assetPath: 'assets/kits/hawkstreak/hawkstreak_kick.wav',
-        ),
-        KitSampleRef(
-          label: 'SNR',
-          assetPath: 'assets/kits/hawkstreak/hawkstreak_snare.wav',
-        ),
-        KitSampleRef(
-          label: 'RIM',
-          assetPath: 'assets/kits/hawkstreak/hawkstreak_rim.wav',
-        ),
-        KitSampleRef(
-          label: 'CLAP',
-          assetPath: 'assets/kits/hawkstreak/hawkstreak_clap.wav',
-        ),
-        KitSampleRef(
-          label: 'CH',
-          assetPath: 'assets/kits/hawkstreak/hawkstreak_hat_closed.wav',
-        ),
-        KitSampleRef(
-          label: 'OH',
-          assetPath: 'assets/kits/hawkstreak/hawkstreak_hat_open.wav',
-        ),
-        KitSampleRef(
-          label: 'SHKR',
-          assetPath: 'assets/kits/hawkstreak/hawkstreak_shaker.wav',
-        ),
-        KitSampleRef(
-          label: 'CNGA',
-          assetPath: 'assets/kits/hawkstreak/hawkstreak_conga.wav',
-        ),
-      ],
-    ),
-    KitRef(
-      id: 'hawkstreak-02',
-      name: 'Hawkstreak 02',
-      credit: 'Hawkstreak, synthesised original. See LICENSING.md.',
-      samples: [
-        KitSampleRef(
-          label: 'KICK',
-          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_kick.wav',
-        ),
-        KitSampleRef(
-          label: 'SNR',
-          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_snare.wav',
-        ),
-        KitSampleRef(
-          label: 'WOOD',
-          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_rim.wav',
-        ),
-        KitSampleRef(
-          label: 'CLAP',
-          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_clap.wav',
-        ),
-        KitSampleRef(
-          label: 'CH',
-          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_hat_closed.wav',
-        ),
-        KitSampleRef(
-          label: 'OH',
-          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_hat_open.wav',
-        ),
-        KitSampleRef(
-          label: 'TAMB',
-          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_shaker.wav',
-        ),
-        KitSampleRef(
-          label: 'TOM',
-          assetPath: 'assets/kits/hawkstreak02/hawkstreak02_conga.wav',
-        ),
-      ],
-    ),
-  ];
+  static final List<KitRef> bundled = List<KitRef>.unmodifiable([
+    for (final pack in PackLibrary.all) ...pack.kits,
+  ]);
 
+  /// What a new project's Kit Beats play. First kit of the first pack, so a
+  /// free pack has to stay first in [PackLibrary.all].
   static KitRef get defaultKit => bundled.first;
 
   static KitRef byId(String id) {

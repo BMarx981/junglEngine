@@ -371,7 +371,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get proFeaturePacksDetail => '为这个而做的鼓点和鼓组，陆续推出。';
 
   @override
-  String get proFreeBundled => '所有内置鼓点和鼓组';
+  String get proFreeBundled => 'Starter 音色包内的全部内容';
 
   @override
   String get proFreeMachines => '两台机器、整个网格、sub 音轨';

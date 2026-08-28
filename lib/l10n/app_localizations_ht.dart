@@ -379,7 +379,7 @@ class AppLocalizationsHt extends AppLocalizations {
       'Break ak kit fèt pou sa a, dapre jan yo soti.';
 
   @override
-  String get proFreeBundled => 'Tout break ak kit ki enkli yo';
+  String get proFreeBundled => 'Tout sa ki nan pakè Starter a';
 
   @override
   String get proFreeMachines => 'De machin yo, tout kadriyaj la, liy sub la';

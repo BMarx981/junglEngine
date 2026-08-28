@@ -371,7 +371,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get proFeaturePacksDetail => 'このために作ったブレイクとキットを、出るたびに。';
 
   @override
-  String get proFreeBundled => '収録のブレイクとキットすべて';
+  String get proFreeBundled => 'Starter パックの中身すべて';
 
   @override
   String get proFreeMachines => '両方のマシン、グリッド全体、subレーン';

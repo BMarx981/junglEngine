@@ -119,7 +119,7 @@
   "proFeatureMidiDetail": "Бит как MIDI-файл и сэмплы, которые он играет, разложенные так, чтобы сразу лечь в Kong или NN-XT.",
   "proFeaturePacksTitle": "ПАКИ СЛАЙСОВ",
   "proFeaturePacksDetail": "Брейки и киты, сделанные под это, по мере выхода.",
-  "proFreeBundled": "Все встроенные брейки и киты",
+  "proFreeBundled": "Всё из пака Starter",
   "proFreeMachines": "Обе машины, вся сетка, дорожка sub",
   "proFreeSongs": "Треки и экспорт в WAV",
   "proFreeNoAds": "Никакой рекламы, никогда"

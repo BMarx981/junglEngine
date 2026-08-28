@@ -380,7 +380,7 @@ class AppLocalizationsFil extends AppLocalizations {
       'Mga break at kit na gawa para dito, habang lumalabas.';
 
   @override
-  String get proFreeBundled => 'Lahat ng kasamang break at kit';
+  String get proFreeBundled => 'Lahat ng nasa Starter pack';
 
   @override
   String get proFreeMachines => 'Parehong makina, buong grid, ang sub lane';

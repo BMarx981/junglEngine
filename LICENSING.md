@@ -4,7 +4,13 @@ Every piece of audio that ships inside junglEngine gets a line here, with its
 origin and its clearance status. Nothing goes to a store build while anything
 below is still `UNCLEARED`.
 
+Content is grouped into packs. A pack is a grouping and an entitlement, not a
+different kind of file: everything in one is bundled inside the app and gets a
+row below whether the pack is free or Pro. See `docs/PACKS.md`.
+
 ## Bundled breaks
+
+### Starter pack (free)
 
 | ID | File | Origin | Status |
 | --- | --- | --- | --- |
@@ -12,6 +18,17 @@ below is still `UNCLEARED`.
 | `hawkstreak-amenish-170` | `assets/breaks/hawkstreak_amenish_170.wav` | Synthesised from scratch by `tool/make_break.dart`. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
 | `hawkstreak-steppa-170` | `assets/breaks/hawkstreak_steppa_170.wav` | Synthesised from scratch by `tool/make_break.dart`. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
 | `hawkstreak-roller-170` | `assets/breaks/hawkstreak_roller_170.wav` | Synthesised from scratch by `tool/make_break.dart`. Two bars. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
+
+### Nightshift pack (Pro)
+
+| ID | File | Origin | Status |
+| --- | --- | --- | --- |
+| `hawkstreak-duppy-170` | `assets/breaks/hawkstreak_duppy_170.wav` | Synthesised from scratch by `tool/make_break.dart`. Two bars, displaced backbeat. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
+| `hawkstreak-lurch-170` | `assets/breaks/hawkstreak_lurch_170.wav` | Synthesised from scratch by `tool/make_break.dart`. One bar, broken beat. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
+
+Being Pro content changes nothing here. A pack somebody paid for is held to the
+same clearance as one they did not, and arguably to a higher one: a free break
+that turns out to be unclearable is embarrassing, a paid one is a refund.
 
 ### `dnb-full02-170` needs a provenance line
 
@@ -26,16 +43,17 @@ contains. Before any store build, replace the Origin cell above with one of:
 - Third party break: written permission on file.
 
 If it turns out to be unclearable, nothing in the code needs to change: drop the
-`BreakRef` from `BreakLibrary.bundled`, delete the WAV, and the synthesised
-placeholder becomes the default again.
+`BreakRef` from the Starter pack in `PackLibrary.all`, delete the WAV, and the
+synthesised placeholder becomes the default again.
 
 `hawkstreak-amenish-170` is a synthesised placeholder, kept as a fallback that
 is guaranteed clear. It is not the default any more.
 
-To add a break: drop the WAV into `assets/breaks/`, add a `BreakRef` to
-`BreakLibrary.bundled`, and add its row above. A break must be exactly the
-number of bars its `BreakRef` declares. `bars` is not cosmetic: slice divisions
-are per bar, so a wrong bar count makes every slice the wrong note value.
+To add a break: drop the WAV into `assets/breaks/`, add a `BreakRef` to a pack
+in `PackLibrary.all`, and add its row above under that pack's heading. A break
+must be exactly the number of bars its `BreakRef` declares. `bars` is not
+cosmetic: slice divisions are per bar, so a wrong bar count makes every slice
+the wrong note value. `docs/PACKS.md` has the whole recipe.
 
 ## One shot kits
 
@@ -43,6 +61,10 @@ are per bar, so a wrong bar count makes every slice the wrong note value.
 | --- | --- | --- | --- |
 | `hawkstreak-01` | `assets/kits/hawkstreak/hawkstreak_*.wav` (8 files) | Synthesised from scratch by `tool/make_kit.dart`. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
 | `hawkstreak-02` | `assets/kits/hawkstreak02/hawkstreak02_*.wav` (8 files) | Synthesised from scratch by `tool/make_kit.dart`. The dark kit. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
+| `hawkstreak-03` | `assets/kits/hawkstreak03/hawkstreak03_*.wav` (8 files) | Synthesised from scratch by `tool/make_kit.dart`. The metal kit, in the Nightshift pack. No sampled material of any kind. | CLEARED (original content, Hawkstreak) |
+
+`hawkstreak-01` and `hawkstreak-02` are in the free Starter pack;
+`hawkstreak-03` is in the Pro Nightshift pack.
 
 ### The M1 kit is synthesised, not the Reason kit
 
@@ -56,9 +78,9 @@ the same file names and delete nothing else. `KitLibrary` is positional, so slot
 order is file order: kick, snare, rim, clap, closed hat, open hat, shaker,
 conga. Update the Origin cell above when you do.
 
-To add a second kit: put its WAVs in `assets/kits/<name>/`, add a `KitRef` to
-`KitLibrary.bundled` with exactly eight samples, add the folder to `pubspec.yaml`
-under `assets:`, and add a row here.
+To add a kit: put its WAVs in `assets/kits/<name>/`, add a `KitRef` with exactly
+eight samples to a pack in `PackLibrary.all`, add the folder to `pubspec.yaml`
+under `assets:`, and add a row here. `docs/PACKS.md` has the whole recipe.
 
 ## Audio the user imports
 
@@ -76,9 +98,9 @@ Two consequences worth stating, because both have been got wrong by other apps:
 - **Exports contain imported audio, and that is the user's to clear.** A WAV or
   a parts zip rendered from an imported break is a derivative of whatever they
   brought in. The app does not police that and cannot.
-- **Slice packs, when they arrive, are a different thing entirely.** Anything
-  Hawkstreak ships as a pack is bundled content and gets a row in the tables
-  above like everything else.
+- **Slice packs are a different thing entirely.** Anything Hawkstreak ships as
+  a pack is bundled content and gets a row in the tables above like everything
+  else. The Nightshift pack is the first, and being Pro bought it no exemption.
 
 ## Checklist before any store submission
 

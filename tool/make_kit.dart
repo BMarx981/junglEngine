@@ -7,11 +7,13 @@
 //
 //   dart run tool/make_kit.dart
 //
-// Two kits: 01 is the bright one the Kit machine shipped with, 02 is the dark
-// one. Same eight positions in both, because slots are positional and a project
-// that switches kit keeps its pattern.
+// Three kits: 01 is the bright one the Kit machine shipped with, 02 is the dark
+// one, 03 is the metal one and is Pro content in the Nightshift pack. Same
+// eight positions in all three, because slots are positional and a project that
+// switches kit keeps its pattern -- including a project that switches from a
+// free kit to a paid one, which is the point of them lining up.
 //
-// See LICENSING.md.
+// See LICENSING.md and docs/PACKS.md.
 
 import 'dart:io';
 import 'dart:math' as math;
@@ -46,6 +48,20 @@ const Map<String, double> _darkLevels = {
   'hat_open': 0.44,
   'shaker': 0.32,
   'conga': 0.74,
+};
+
+/// The metal kit is the loudest of the three on top and the tightest at the
+/// bottom: its kick is short, so it needs the level to land, and its hats are
+/// meant to be heard through a break rather than under one.
+const Map<String, double> _steelLevels = {
+  'kick': 0.95,
+  'snare': 0.92,
+  'rim': 0.68,
+  'clap': 0.72,
+  'hat_closed': 0.50,
+  'hat_open': 0.56,
+  'shaker': 0.42,
+  'conga': 0.70,
 };
 
 void main() {
@@ -83,6 +99,25 @@ void main() {
         'hat_open': _darkHat(random, open: true),
         'shaker': _tambourine(random),
         'conga': _lowTom(random),
+      };
+    },
+  );
+
+  _write(
+    directory: 'assets/kits/hawkstreak03',
+    prefix: 'hawkstreak03',
+    levels: _steelLevels,
+    voices: () {
+      final random = math.Random(1988);
+      return <String, Float32List>{
+        'kick': _steelKick(random),
+        'snare': _ringSnare(random),
+        'rim': _metalRim(random),
+        'clap': _tightClap(random),
+        'hat_closed': _sizzleHat(random, open: false),
+        'hat_open': _sizzleHat(random, open: true),
+        'shaker': _maraca(random),
+        'conga': _highTom(random),
       };
     },
   );
@@ -376,6 +411,155 @@ Float32List _lowTom(math.Random random) {
         math.exp(-t * 11);
     final stick = (random.nextDouble() * 2 - 1) * math.exp(-t * 500) * 0.18;
     out[i] = _tanh((body + stick) * 1.3);
+  }
+  return out;
+}
+
+// --- Kit 03: the metal one, in the Nightshift pack --------------------------
+//
+// The third corner. 01 is bright and round, 02 is dark and soft, and this one
+// is hard and inharmonic: short kick, ringing snare, and tuned metal where the
+// other two have skin and wood. It is the kit for a Beat that has to sit on top
+// of a break rather than under it, which is what the Nightshift breaks want.
+//
+// Everything here is built from inharmonic partials -- ratios that are not
+// whole numbers -- because that is the difference between a struck metal bar
+// and a drum, and it is the whole character of the kit.
+
+Float32List _steelKick(math.Random random) {
+  final n = _frames(0.24);
+  final out = Float32List(n);
+  var phase = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    // A fast, deep sweep and a short body: this one is a punch, not a weight,
+    // and it leaves the bottom of the mix to the sub lane on purpose.
+    final freq = 52.0 + 210.0 * math.exp(-t * 95);
+    phase += freq / sampleRate;
+    final body = math.sin(2 * math.pi * phase) * math.exp(-t * 26);
+    final click = (random.nextDouble() * 2 - 1) * math.exp(-t * 1100) * 0.34;
+    out[i] = _tanh((body + click) * 1.9) * 0.95;
+  }
+  return out;
+}
+
+Float32List _ringSnare(math.Random random) {
+  final n = _frames(0.30);
+  final out = Float32List(n);
+  var hp = 0.0;
+  var previous = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    // Two partials at 1 : 2.41, which is not a musical interval and is why it
+    // rings rather than sounding tuned.
+    final ring =
+        (math.sin(2 * math.pi * 246 * t) * math.exp(-t * 18) +
+            0.55 * math.sin(2 * math.pi * 593 * t) * math.exp(-t * 26)) *
+        0.5;
+    final white = random.nextDouble() * 2 - 1;
+    hp = 0.94 * (hp + white - previous);
+    previous = white;
+    final noise = hp * math.exp(-t * 30) * 0.7;
+    out[i] = _tanh((ring + noise) * 1.3);
+  }
+  return out;
+}
+
+Float32List _metalRim(math.Random random) {
+  final n = _frames(0.09);
+  final out = Float32List(n);
+  // Four partials off a 2100 Hz fundamental, none of them harmonic. A bell in
+  // miniature, which is what a rim shot on a metal shell is.
+  const partials = [1.0, 1.73, 2.41, 3.19];
+  const weights = [1.0, 0.62, 0.44, 0.28];
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    var tone = 0.0;
+    for (var p = 0; p < partials.length; p++) {
+      tone +=
+          math.sin(2 * math.pi * 2100 * partials[p] * t) *
+          weights[p] *
+          math.exp(-t * (70 + 26 * p));
+    }
+    final strike = (random.nextDouble() * 2 - 1) * math.exp(-t * 1600) * 0.4;
+    out[i] = _tanh((tone * 0.5 + strike) * 1.2);
+  }
+  return out;
+}
+
+Float32List _tightClap(math.Random random) {
+  final n = _frames(0.09);
+  final out = Float32List(n);
+  // One burst and no room at all. Next to the other two claps this is the one
+  // that can go on every sixteenth without turning into a wash.
+  var hp = 0.0;
+  var previous = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    final white = random.nextDouble() * 2 - 1;
+    hp = 0.92 * (hp + white - previous);
+    previous = white;
+    out[i] = _tanh(hp * math.exp(-t * 84) * 1.4);
+  }
+  return out;
+}
+
+Float32List _sizzleHat(math.Random random, {required bool open}) {
+  final n = _frames(open ? 0.30 : 0.045);
+  final out = Float32List(n);
+  final decay = open ? 12.5 : 130.0;
+  var hp1 = 0.0;
+  var hp2 = 0.0;
+  var p1 = 0.0;
+  var p2 = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    final white = random.nextDouble() * 2 - 1;
+    hp1 = 0.978 * (hp1 + white - p1);
+    p1 = white;
+    hp2 = 0.978 * (hp2 + hp1 - p2);
+    p2 = hp1;
+    // A pair of high partials rung by the noise, so it sizzles instead of
+    // hissing. Two hats hitting each other, not sand in a tube.
+    final metal =
+        (math.sin(2 * math.pi * 7400 * t) + math.sin(2 * math.pi * 9130 * t)) *
+        0.14;
+    out[i] = (hp2 + metal) * math.exp(-t * decay) * 0.8;
+  }
+  return out;
+}
+
+Float32List _maraca(math.Random random) {
+  final n = _frames(0.075);
+  final out = Float32List(n);
+  var hp = 0.0;
+  var previous = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    final white = random.nextDouble() * 2 - 1;
+    hp = 0.94 * (hp + white - previous);
+    previous = white;
+    // Harder and shorter than kit 01's shaker: beads against a shell, hit
+    // rather than swung, so it works on the offbeat sixteenths.
+    final attack = 1 - math.exp(-t * 900);
+    out[i] = hp * attack * math.exp(-t * 68) * 0.95;
+  }
+  return out;
+}
+
+Float32List _highTom(math.Random random) {
+  final n = _frames(0.19);
+  final out = Float32List(n);
+  var phase = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    final freq = 268.0 + 92.0 * math.exp(-t * 80);
+    phase += freq / sampleRate;
+    final body =
+        (math.sin(2 * math.pi * phase) + 0.3 * math.sin(5.6 * math.pi * phase)) *
+        math.exp(-t * 22);
+    final stick = (random.nextDouble() * 2 - 1) * math.exp(-t * 800) * 0.24;
+    out[i] = _tanh((body + stick) * 1.35);
   }
   return out;
 }

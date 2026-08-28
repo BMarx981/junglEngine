@@ -119,7 +119,7 @@
   "proFeatureMidiDetail": "البيت كملف MIDI مع العيّنات التي يعزفها، موزّعة لتدخل مباشرة في Kong أو NN-XT.",
   "proFeaturePacksTitle": "حزم المقاطع",
   "proFeaturePacksDetail": "بريكات وأطقم مصنوعة لهذا، كلّما صدرت.",
-  "proFreeBundled": "كل البريكات والأطقم المضمّنة",
+  "proFreeBundled": "كل ما في حزمة Starter",
   "proFreeMachines": "كلتا الآلتين، والشبكة بأكملها، ومسار sub",
   "proFreeSongs": "الأغاني وتصدير WAV",
   "proFreeNoAds": "بلا إعلانات، أبدًا"

@@ -11,11 +11,14 @@ import 'package:junglengine/features/bass/sub_lane_view.dart';
 import 'package:junglengine/features/bass/sub_panel.dart';
 import 'package:junglengine/features/export/export_sheet.dart';
 import 'package:junglengine/features/grid/chop_grid.dart';
+import 'package:junglengine/features/library/break_library.dart';
+import 'package:junglengine/features/library/library_sheet.dart';
 import 'package:junglengine/features/pro/pro_controller.dart';
 import 'package:junglengine/features/song/beat_bar.dart';
 import 'package:junglengine/features/song/new_beat_sheet.dart';
 import 'package:junglengine/features/studio_screen.dart';
 import 'package:junglengine/features/transport/action_bar.dart';
+import 'package:junglengine/features/transport/transport_bar.dart';
 import 'package:junglengine/l10n/l10n.dart';
 import 'package:junglengine/state/studio.dart';
 import 'package:junglengine/theme.dart';
@@ -157,6 +160,31 @@ void main() {
         expect(exportSheet, isEmpty, reason: 'export in $where: $exportSheet');
         await tester.tapAt(const Offset(10, 10));
         await tester.pumpAndSettle();
+
+        // The library sheet: a row per break and per kit, plus a pack heading
+        // over each group. The tallest sheet in the app, and the one that grows
+        // every time a pack ships, so what it is checked for is that it lays
+        // out at all -- no RenderFlex overflow anywhere in it, at any length
+        // any of the twelve locales produces.
+        //
+        // Deliberately not run through _clipped. That helper is for text
+        // silently squeezed inside a fixed box; these rows declare
+        // TextOverflow.ellipsis, which is a visible choice rather than a
+        // failure, and the test font's square glyphs make every readout in them
+        // measure about half again as wide as it renders on a device. Both
+        // together make a _clipped assertion here false rather than strict.
+        await tester.tap(
+          find.descendant(
+            of: find.byType(TransportBar),
+            matching: find.text(BreakLibrary.defaultBreak.name.toUpperCase()),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: 'library in $where');
+        expect(find.byType(LibrarySheet), findsOneWidget, reason: where);
+        await tester.tapAt(const Offset(10, 10));
+        await tester.pumpAndSettle();
+        expect(find.byType(LibrarySheet), findsNothing, reason: where);
 
         // The sub note editor: a heading, a hint line and a footer of three
         // buttons sharing one phone width.

@@ -119,7 +119,7 @@
   "proFeatureMidiDetail": "비트의 MIDI 파일과 재생되는 샘플을, Kong이나 NN-XT에 바로 얹을 수 있게 매핑해서.",
   "proFeaturePacksTitle": "슬라이스 팩",
   "proFeaturePacksDetail": "이걸 위해 만든 브레이크와 킷을, 나올 때마다.",
-  "proFreeBundled": "기본 제공 브레이크와 킷 전부",
+  "proFreeBundled": "Starter 팩에 있는 모든 것",
   "proFreeMachines": "두 머신, 그리드 전체, sub 레인",
   "proFreeSongs": "송과 WAV 내보내기",
   "proFreeNoAds": "광고는 절대 없음"

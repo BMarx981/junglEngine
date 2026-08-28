@@ -12,6 +12,7 @@ import 'package:junglengine/features/grid/chop_grid.dart';
 import 'package:junglengine/features/grid/step_mod_sheet.dart';
 import 'package:junglengine/features/kit/kit_grid.dart';
 import 'package:junglengine/features/library/break_library.dart';
+import 'package:junglengine/features/library/pack.dart';
 import 'package:junglengine/features/pro/paywall.dart';
 import 'package:junglengine/features/pro/pro_controller.dart';
 import 'package:junglengine/features/song/beat_bar.dart';
@@ -784,7 +785,78 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('IMPORT YOUR OWN'), findsOneWidget);
-      expect(find.text('PRO'), findsOneWidget);
+      // One on the import row, and one on every row of every Pro pack. Said
+      // before it is tapped, on the row and not only on the pack heading: the
+      // sheet scrolls, and a heading that has gone off the top is not a
+      // warning.
+      final locked = PackLibrary.all
+          .where((p) => p.isPro)
+          .fold(0, (n, p) => n + p.breaks.length + p.kits.length);
+      expect(find.text('PRO'), findsNWidgets(1 + locked));
+    });
+
+    testWidgets('a break from a Pro pack asks before it switches', (
+      tester,
+    ) async {
+      await pumpStudio(tester);
+      final locked = PackLibrary.all.firstWhere((p) => p.isPro).breaks.first;
+
+      await tester.tap(find.text(BreakLibrary.defaultBreak.name.toUpperCase()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(locked.name.toUpperCase()));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Paywall), findsOneWidget);
+
+      // Backing out of the paywall leaves the project where it was. Changing
+      // the break reslices every Chop Beat, so a refusal that switched anyway
+      // would cost patterns.
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(BreakLibrary.defaultBreak.name.toUpperCase()),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('unlocking Pro lands the pick that opened the paywall', (
+      tester,
+    ) async {
+      await pumpStudio(tester);
+      final locked = PackLibrary.all.firstWhere((p) => p.isPro).breaks.first;
+
+      await tester.tap(find.text(BreakLibrary.defaultBreak.name.toUpperCase()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(locked.name.toUpperCase()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('DEBUG: UNLOCK WITHOUT BUYING'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Paywall), findsNothing);
+      // Nothing is locked any more, so nothing carries the tag but the import
+      // row, which is now unlocked too.
+      expect(find.text('PRO'), findsNothing);
+
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+      expect(find.text(locked.name.toUpperCase()), findsOneWidget);
+    });
+
+    testWidgets('a kit from a Pro pack asks the same way', (tester) async {
+      await pumpStudio(tester);
+      final locked = PackLibrary.all.firstWhere((p) => p.isPro).kits.first;
+
+      await tester.tap(find.text(BreakLibrary.defaultBreak.name.toUpperCase()));
+      await tester.pumpAndSettle();
+      // The kits are at the bottom of a sheet that grows with the library.
+      await tester.ensureVisible(find.text(locked.name.toUpperCase()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(locked.name.toUpperCase()));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Paywall), findsOneWidget);
     });
 
     testWidgets('a kit slot offers importing a one shot', (tester) async {

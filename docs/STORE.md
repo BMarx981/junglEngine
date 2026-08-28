@@ -78,10 +78,11 @@ in the same commit as the thing it describes.
       a message. Trim it, tap the tempo, chop it.
     - MIDI plus slices export: the beat as a MIDI file and the samples it plays,
       mapped to drop straight into Kong or NN-XT.
-    - Slice packs as they land.
+    - Slice packs: breaks and kits made for this, as they land. Nightshift is
+      the first, and every one after it is included.
 
-    Everything else stays free: every bundled break and kit, both machines, the
-    grid, the sub lane, songs and WAV export.
+    Everything else stays free: everything in the Starter pack, both machines,
+    the grid, the sub lane, songs and WAV export.
 
     NOT A DAW
 

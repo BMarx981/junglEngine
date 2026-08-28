@@ -132,9 +132,10 @@ Slots are positional: slot *n* plays sample *n*, and a Beat's per slot volume
 and pitch hang off that position. One kit per project, like the break, chosen
 from the library sheet behind the break name in the transport bar.
 
-Two kits ship: `hawkstreak-01` is the bright one, `hawkstreak-02` the dark one.
-Because slots are positional, switching kit keeps every pattern and every slot
-setting: the same programming played by different drums.
+Three kits ship: `hawkstreak-01` is the bright one, `hawkstreak-02` the dark
+one, and `hawkstreak-03` is the metal one in the Pro Nightshift pack. Because
+slots are positional, switching kit keeps every pattern and every slot setting:
+the same programming played by different drums, free kit to paid one included.
 
 The bundled kits are synthesised, not sampled, so they are guaranteed clear:
 
@@ -161,16 +162,37 @@ break, which cannot chop.
 That makes `BreakRef.bars` load bearing rather than cosmetic. Get it wrong and
 every slice is the wrong note value.
 
-To add a break: drop the WAV into `assets/breaks/`, add a `BreakRef` to
-`BreakLibrary.bundled`, and add a row to [LICENSING.md](LICENSING.md). 8, 16,
-24 and 32 bit PCM and float WAVs all decode, mono or stereo, any sample rate.
+To add a break: drop the WAV into `assets/breaks/`, add a `BreakRef` to a pack
+in `PackLibrary.all`, and add a row to [LICENSING.md](LICENSING.md). 8, 16, 24
+and 32 bit PCM and float WAVs all decode, mono or stereo, any sample rate.
 
-The Hawkstreak breaks — Amenish, Steppa and the two bar Roller — are generated,
-not sampled, so they are guaranteed clear:
+The Hawkstreak breaks — Amenish, Steppa, the two bar Roller, and Duppy and Lurch
+in the Nightshift pack — are generated, not sampled, so they are guaranteed
+clear:
 
 ```sh
 dart run tool/make_break.dart
 ```
+
+## Packs
+
+Breaks and kits are grouped into packs, and a pack is where content is
+registered: `PackLibrary.all` is the catalogue, and `BreakLibrary.bundled` and
+`KitLibrary.bundled` are flattened out of it, so nothing below the library knows
+packs exist. A project stores a break id and a kit id as it always did, so packs
+changed no JSON and needed no schema bump.
+
+**Starter** is free and is what the app opens with. **Nightshift** is Pro: two
+breaks and a kit, unlocked by the same one purchase as import and MIDI export,
+along with every pack after it. Everything ships inside the binary; there are no
+downloads and there is no server.
+
+The gate is on picking, not on playing. Selecting a locked row shows the
+paywall; a project that already points at a pack break goes on playing it
+whatever the store says, because the store has not answered yet on a cold start
+and because changing the break reslices every Chop Beat.
+
+[docs/PACKS.md](docs/PACKS.md) is the recipe for adding one.
 
 ## Bring your own audio
 

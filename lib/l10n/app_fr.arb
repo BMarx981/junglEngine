@@ -119,7 +119,7 @@
   "proFeatureMidiDetail": "Le beat en fichier MIDI et les samples qu'il joue, mappés pour tomber directement dans Kong ou NN-XT.",
   "proFeaturePacksTitle": "PACKS DE SLICES",
   "proFeaturePacksDetail": "Des breaks et des kits faits pour ça, au fil des sorties.",
-  "proFreeBundled": "Tous les breaks et kits inclus",
+  "proFreeBundled": "Tout le contenu du pack Starter",
   "proFreeMachines": "Les deux machines, toute la grille, la piste sub",
   "proFreeSongs": "Morceaux et export WAV",
   "proFreeNoAds": "Aucune pub, jamais"

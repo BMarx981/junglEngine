@@ -372,7 +372,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get proFeaturePacksDetail => '이걸 위해 만든 브레이크와 킷을, 나올 때마다.';
 
   @override
-  String get proFreeBundled => '기본 제공 브레이크와 킷 전부';
+  String get proFreeBundled => 'Starter 팩에 있는 모든 것';
 
   @override
   String get proFreeMachines => '두 머신, 그리드 전체, sub 레인';

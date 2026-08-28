@@ -375,7 +375,7 @@ class AppLocalizationsVi extends AppLocalizations {
       'Break và kit làm riêng cho việc này, ra tới đâu có tới đó.';
 
   @override
-  String get proFreeBundled => 'Toàn bộ break và kit đi kèm';
+  String get proFreeBundled => 'Mọi thứ trong gói Starter';
 
   @override
   String get proFreeMachines => 'Cả hai máy, toàn bộ lưới, làn sub';

@@ -6,12 +6,18 @@
 //
 //   dart run tool/make_break.dart
 //
-// Three of them, and deliberately three different shapes rather than three
+// Five of them, and deliberately five different shapes rather than five
 // versions of the same bar: a one bar amen, a one bar half time stepper, and a
-// two bar roller. The two bar one is also what proves slice divisions are per
-// bar and not per break.
+// two bar roller in the free starter pack, then a two bar break with the
+// backbeat displaced and a one bar broken beat in the Nightshift pack. The two
+// bar ones are also what prove slice divisions are per bar and not per break.
 //
-// See LICENSING.md.
+// The last two are Pro content. Nothing about generating them differs -- a pack
+// is a grouping in PackLibrary, not a different kind of file -- but they use
+// their own voices, because a pack somebody paid for should not be the same
+// four drums in a new order.
+//
+// See LICENSING.md and docs/PACKS.md.
 
 import 'dart:io';
 import 'dart:math' as math;
@@ -40,6 +46,20 @@ void main() {
     bars: 2,
     seed: 1996,
     build: _roller,
+  );
+
+  // The Nightshift pack.
+  _write(
+    path: 'assets/breaks/hawkstreak_duppy_170.wav',
+    bars: 2,
+    seed: 1993,
+    build: _duppy,
+  );
+  _write(
+    path: 'assets/breaks/hawkstreak_lurch_170.wav',
+    bars: 1,
+    seed: 1997,
+    build: _lurch,
   );
 }
 
@@ -179,6 +199,136 @@ void _roller(_Take take) {
   }
   take.at(8, openHat, gain: 0.44, pan: 0.26);
   take.at(24, openHat, gain: 0.5, pan: 0.26);
+}
+
+// --- The Nightshift pack ----------------------------------------------------
+//
+// Two breaks that are not shapes the starter pack already has. The starter
+// breaks all put a backbeat where a backbeat goes; these two do not, which is
+// the point of them: a chopper wants raw material that is already awkward,
+// because the awkward hits are the ones worth moving.
+
+/// Two bars with the backbeat displaced, and no kick on the top of bar two.
+///
+/// The hole where the downbeat should be is the whole break. Painting a slice
+/// onto step 16 puts it back, which is a thing you can only do if the source
+/// left the room for it.
+void _duppy(_Take take) {
+  final random = take.random;
+  final kick = _subKick(random);
+  final snare = _crack(random, 1.0);
+  final ghost = _crack(random, 0.3, short: true);
+  final hat = _hat(random, open: false);
+  final openHat = _hat(random, open: true);
+
+  // Bar one: the backbeat is late on both halves, on 5 and 13 rather than 4
+  // and 12, so the bar leans forward the whole way through.
+  take.at(0, kick, gain: 1.0);
+  take.at(6, kick, gain: 0.72);
+  take.at(10, kick, gain: 0.9);
+  take.at(5, snare, gain: 1.0);
+  take.at(13, snare, gain: 0.94);
+  take.at(3, ghost, gain: 0.52, pan: -0.14);
+  take.at(8, ghost, gain: 0.44, pan: 0.16);
+  take.at(15, ghost, gain: 0.72, pan: -0.08);
+
+  // Bar two: nothing on 16. The first kick of the bar arrives on 18 and the
+  // snare goes back where it belongs, so the bar lands the moment it stops
+  // being late.
+  take.at(18, kick, gain: 0.96);
+  take.at(24, kick, gain: 0.84);
+  take.at(28, kick, gain: 0.56);
+  take.at(20, snare, gain: 1.0);
+  take.at(29, snare, gain: 0.78);
+  take.at(22, ghost, gain: 0.6, pan: 0.12);
+  take.at(26, ghost, gain: 0.5, pan: -0.16);
+  take.at(31, ghost, gain: 0.66, pan: 0.2);
+
+  for (var step = 2; step < 32; step += 2) {
+    if (step == 14 || step == 22) continue;
+    take.at(step, hat, gain: step % 4 == 0 ? 0.42 : 0.28, pan: 0.24);
+  }
+  take.at(14, openHat, gain: 0.46, pan: 0.28);
+  take.at(22, openHat, gain: 0.4, pan: 0.28);
+}
+
+/// One bar that stumbles: kicks in threes against a snare that lands early.
+///
+/// Sixteen steps grouped 3-3-3-3-4 instead of 4-4-4-4. Chopped at 16 every row
+/// is a hit, and the rows are not the ones a straight break would give you.
+void _lurch(_Take take) {
+  final random = take.random;
+  final kick = _subKick(random);
+  final snare = _crack(random, 1.0);
+  final ghost = _crack(random, 0.32, short: true);
+  final hat = _hat(random, open: false);
+  final openHat = _hat(random, open: true);
+
+  take.at(0, kick, gain: 1.0);
+  take.at(3, kick, gain: 0.62);
+  take.at(9, kick, gain: 0.88);
+
+  // On 6, which is neither 4 nor 8. Two steps early against a backbeat and two
+  // steps late against a half time one.
+  take.at(6, snare, gain: 1.0);
+  take.at(11, snare, gain: 0.7);
+
+  take.at(13, ghost, gain: 0.66, pan: -0.16);
+  take.at(14, ghost, gain: 0.48, pan: 0.18);
+  take.at(15, ghost, gain: 0.8, pan: -0.06);
+
+  for (final step in [0, 3, 6, 9, 12]) {
+    take.at(step, hat, gain: step == 0 ? 0.48 : 0.32, pan: 0.22);
+  }
+  take.at(12, openHat, gain: 0.44, pan: 0.26);
+}
+
+/// Longer and lower than [_kick], with the click taken off it.
+///
+/// The Nightshift breaks are meant to be chopped short, and a kick with a
+/// transient spike survives being cut at the eighth note in a way a rounder one
+/// does not: the spike is what you hear, so the slice still reads as a kick.
+Float32List _subKick(math.Random random) {
+  final n = (sampleRate * 0.44).round();
+  final out = Float32List(n);
+  var phase = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    final freq = 40.0 + 104.0 * math.exp(-t * 40);
+    phase += freq / sampleRate;
+    final body = math.sin(2 * math.pi * phase) * math.exp(-t * 9);
+    final thud = (random.nextDouble() * 2 - 1) * math.exp(-t * 280) * 0.16;
+    out[i] = _tanh((body + thud) * 1.6) * 0.95;
+  }
+  return out;
+}
+
+/// A snare with the body pulled out and the crack left in.
+///
+/// Higher and drier than [_snare], so it cuts through a break that is already
+/// busy underneath it and so a reversed slice of it reads as a reverse rather
+/// than as mud.
+Float32List _crack(math.Random random, double weight, {bool short = false}) {
+  final n = (sampleRate * (short ? 0.085 : 0.19)).round();
+  final out = Float32List(n);
+  final noiseDecay = short ? 74.0 : 26.0;
+  var hp = 0.0;
+  var previous = 0.0;
+  for (var i = 0; i < n; i++) {
+    final t = i / sampleRate;
+    final tone =
+        (math.sin(2 * math.pi * 232 * t) +
+            0.5 * math.sin(2 * math.pi * 412 * t)) *
+        math.exp(-t * 58) *
+        0.34;
+    final white = random.nextDouble() * 2 - 1;
+    // Steeper than the starter snare's highpass: less shell, more wire.
+    hp = 0.93 * (hp + white - previous);
+    previous = white;
+    final noise = hp * math.exp(-t * noiseDecay) * 0.8;
+    out[i] = _tanh((tone + noise) * 1.35) * weight;
+  }
+  return out;
 }
 
 Float32List _kick(math.Random random) {

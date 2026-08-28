@@ -19,7 +19,8 @@ turns up *inside* a translatable string, you leave it alone:
 > TONE · CUTOFF · DRIVE · DECAY · GLIDE · WAV · MIDI · PRO ·
 > kHz · bit · 44.1 kHz 16 bit · Kong · NN-XT · Files · iCloud · Drive ·
 > the note names C to B · the kit slot labels KICK SNR RIM CLAP CH OH SHKR
-> CNGA WOOD TAMB TOM · the app name junglEngine
+> CNGA WOOD TAMB TOM · the app name junglEngine · the pack names Starter and
+> Nightshift, and every pack name after them
 
 Where one of these is embedded in a string you are translating, the string's
 `@description` says so explicitly.
@@ -42,6 +43,7 @@ Domain meanings, so the translation is about the right thing:
 | song | an ordered list of patterns with repeat counts |
 | card | one entry in that list |
 | kit | a set of eight drum samples |
+| pack | a set of breaks and kits that ship together, named after itself |
 | one shot | a single drum sample played once, never looped |
 | pad | one drum sound's row in the kit grid |
 | lane | the horizontal track the bass notes sit in |

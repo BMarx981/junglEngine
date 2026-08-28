@@ -68,6 +68,31 @@ Goal: converge on Lira.
 
 GATE: Measurable improvement users would notice. If the honest answer is "it is just cleaner architecture," do not merge, keep shipping features.
 
+## M5: Content
+
+Goal: give Pro a third leg to stand on.
+
+The M4 gate names this by name: if the Rust engine is not a measurable win,
+"defer indefinitely and spend the time on content packs instead". The paywall
+has been selling slice packs since M3 and there were none, which is the one
+promise in the app that was not kept.
+
+- Content grouped into packs: a free Starter pack, and Pro packs unlocked by the
+  one existing product. Bundled in the binary, no downloads, no new IAP.
+- First Pro pack: two breaks and a kit, synthesised originals from `tool/`.
+- The library sheet shows packs and locks the Pro ones behind the existing
+  paywall. The gate is on picking, never on playing.
+- `docs/PACKS.md` is the recipe for pack N+1, and LICENSING.md gets a row per
+  file as always.
+
+GATE: A B a groove built only out of the Pro pack against one built out of the
+Starter pack, on a phone, a week apart from writing it. Is the pack the reason
+the first one is better, or is it only different? If it is only different, it is
+not worth money and the answer is a better pack rather than a third one. Then
+ask the harder question: does one pack make Pro worth buying, or does the pitch
+need three, and is that content work or a pack that is genuinely a different
+sound?
+
 ## Explicitly parked (do not open branches for these)
 
 - Transient detection slicing

@@ -119,7 +119,7 @@
   "proFeatureMidiDetail": "节奏的 MIDI 文件和它播放的采样，映射好后可直接放进 Kong 或 NN-XT。",
   "proFeaturePacksTitle": "切片包",
   "proFeaturePacksDetail": "为这个而做的鼓点和鼓组，陆续推出。",
-  "proFreeBundled": "所有内置鼓点和鼓组",
+  "proFreeBundled": "Starter 音色包内的全部内容",
   "proFreeMachines": "两台机器、整个网格、sub 音轨",
   "proFreeSongs": "歌曲与 WAV 导出",
   "proFreeNoAds": "永远没有广告"

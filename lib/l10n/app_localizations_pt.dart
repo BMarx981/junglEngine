@@ -381,7 +381,7 @@ class AppLocalizationsPt extends AppLocalizations {
       'Breaks e kits feitos para isto, à medida que forem saindo.';
 
   @override
-  String get proFreeBundled => 'Todos os breaks e kits incluídos';
+  String get proFreeBundled => 'Tudo o que vem no pack Starter';
 
   @override
   String get proFreeMachines =>

@@ -742,10 +742,10 @@ abstract class AppLocalizations {
   /// **'Breaks and kits made for this, as they land.'**
   String get proFeaturePacksDetail;
 
-  /// One item in the list of things that stay free. Bundled means shipped with the app. Sentence case.
+  /// One item in the list of things that stay free. The Starter pack is the set of breaks and kits the app opens with; 'Starter' is its name and stays English, the word 'pack' is translated. Sentence case.
   ///
   /// In en, this message translates to:
-  /// **'Every bundled break and kit'**
+  /// **'Everything in the Starter pack'**
   String get proFreeBundled;
 
   /// One item in the list of things that stay free. The two machines are the break resequencer and the drum machine; the sub lane is the bass track. Sentence case.

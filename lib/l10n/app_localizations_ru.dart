@@ -388,7 +388,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Брейки и киты, сделанные под это, по мере выхода.';
 
   @override
-  String get proFreeBundled => 'Все встроенные брейки и киты';
+  String get proFreeBundled => 'Всё из пака Starter';
 
   @override
   String get proFreeMachines => 'Обе машины, вся сетка, дорожка sub';

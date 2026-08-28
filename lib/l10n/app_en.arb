@@ -457,9 +457,9 @@
   "@proFeaturePacksDetail": {
     "description": "Describes the slice packs feature. Sentence case. 'As they land' means as they are released over time; it is deliberately casual."
   },
-  "proFreeBundled": "Every bundled break and kit",
+  "proFreeBundled": "Everything in the Starter pack",
   "@proFreeBundled": {
-    "description": "One item in the list of things that stay free. Bundled means shipped with the app. Sentence case."
+    "description": "One item in the list of things that stay free. The Starter pack is the set of breaks and kits the app opens with; 'Starter' is its name and stays English, the word 'pack' is translated. Sentence case."
   },
   "proFreeMachines": "Both machines, the whole grid, the sub lane",
   "@proFreeMachines": {
