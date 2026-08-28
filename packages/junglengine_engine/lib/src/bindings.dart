@@ -126,6 +126,10 @@ typedef JeRenderOfflineDart =
 typedef JeAuditionIndexNative = Int32 Function(Pointer<Void>, Int32);
 typedef JeAuditionIndexDart = int Function(Pointer<Void>, int);
 
+/// A slot and the level to sound it at, in the spec's own velocity encoding.
+typedef JeAuditionKitNative = Int32 Function(Pointer<Void>, Int32, Int32);
+typedef JeAuditionKitDart = int Function(Pointer<Void>, int, int);
+
 typedef JeAuditionClipNative =
     Int32 Function(Pointer<Void>, Pointer<Float>, Int64, Int32);
 typedef JeAuditionClipDart =
@@ -182,7 +186,7 @@ class JeBindings {
             'je_engine_audition_slice',
           ),
       auditionKitSlot = library
-          .lookupFunction<JeAuditionIndexNative, JeAuditionIndexDart>(
+          .lookupFunction<JeAuditionKitNative, JeAuditionKitDart>(
             'je_engine_audition_kit_slot',
           ),
       auditionClip = library
@@ -223,7 +227,7 @@ class JeBindings {
   /// free to have changed while the device was closed, or a negative code.
   final JeIntHandleDart resume;
   final JeAuditionIndexDart auditionSlice;
-  final JeAuditionIndexDart auditionKitSlot;
+  final JeAuditionKitDart auditionKitSlot;
   final JeAuditionClipDart auditionClip;
   final JeIntHandleDart stopAuditionClip;
   final JeLoopFramesDart loopFrames;

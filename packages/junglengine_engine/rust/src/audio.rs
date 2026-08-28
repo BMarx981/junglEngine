@@ -20,7 +20,7 @@ use rtrb::{Consumer, Producer};
 use crate::command::{Command, Publication, Retired, When};
 use crate::preview::PreviewVoice;
 use crate::renderer::PatternRenderer;
-use crate::spec::KIT_SLOT_COUNT;
+use crate::spec::{KitVelocity, KIT_SLOT_COUNT};
 use crate::transport::TransportShared;
 
 /// Volume a tapped slice sounds at, matching what the flutter_soloud engine
@@ -121,7 +121,9 @@ impl AudioSide {
                 }
                 Command::CancelQueued => self.bin_queued(),
                 Command::AuditionSlice(index) => self.audition_slice(index),
-                Command::AuditionKitSlot(slot) => self.audition_kit_slot(slot),
+                Command::AuditionKitSlot { slot, velocity } => {
+                    self.audition_kit_slot(slot, velocity)
+                }
                 Command::AuditionClip { clip, looping } => {
                     let frames = clip.frames();
                     let displaced = self.preview.play(
@@ -222,7 +224,7 @@ impl AudioSide {
         self.bin(displaced);
     }
 
-    fn audition_kit_slot(&mut self, slot: i32) {
+    fn audition_kit_slot(&mut self, slot: i32, velocity: i32) {
         if slot < 0 || slot as usize >= KIT_SLOT_COUNT {
             return;
         }
@@ -231,12 +233,17 @@ impl AudioSide {
             return;
         };
         // A tapped pad sounds at the slot's own volume and pitch, and at full
-        // velocity: the pad is not a step, so there is no velocity on it.
+        // velocity: the pad is not a step, so there is no velocity on it. A
+        // tapped step carries one, and sounds at it, because the preview is
+        // the answer to "what did I just write" and a soft hit that previewed
+        // hard would be answering a different question.
         let settings = plan.spec.beat().slot(slot as usize);
+        let gain = settings.volume
+            * KitVelocity::from_code(velocity as i64).map_or(1.0, KitVelocity::gain);
         let frames = clip.frames();
-        let displaced =
-            self.preview
-                .play(clip, 0, frames, settings.rate(), settings.volume, false);
+        let displaced = self
+            .preview
+            .play(clip, 0, frames, settings.rate(), gain, false);
         self.bin(displaced);
     }
 

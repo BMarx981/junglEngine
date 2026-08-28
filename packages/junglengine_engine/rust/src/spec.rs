@@ -127,13 +127,19 @@ impl KitVelocity {
         }
     }
 
-    fn from_json(value: Option<&Value>) -> Option<Self> {
-        match value.and_then(Value::as_i64) {
-            Some(1) => Some(KitVelocity::Soft),
-            Some(2) => Some(KitVelocity::Medium),
-            Some(3) => Some(KitVelocity::Hard),
+    /// The wire encoding, shared by the spec JSON and the audition call: 1, 2
+    /// and 3 are the three levels and anything else is no hit at all.
+    pub fn from_code(code: i64) -> Option<Self> {
+        match code {
+            1 => Some(KitVelocity::Soft),
+            2 => Some(KitVelocity::Medium),
+            3 => Some(KitVelocity::Hard),
             _ => None,
         }
+    }
+
+    fn from_json(value: Option<&Value>) -> Option<Self> {
+        Self::from_code(value.and_then(Value::as_i64).unwrap_or(0))
     }
 }
 

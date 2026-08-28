@@ -9,6 +9,7 @@ import 'package:junglengine/audio/engine.dart';
 import 'package:junglengine/audio/pattern_renderer.dart';
 import 'package:junglengine/audio/platform_session.dart';
 import 'package:junglengine/audio/wav.dart';
+import 'package:junglengine/models/kit_pattern.dart';
 import 'package:junglengine/models/kit_slot.dart';
 
 /// flutter_soloud backed engine.
@@ -478,7 +479,7 @@ class SoLoudAudioEngine implements AudioEngine {
   }
 
   @override
-  Future<void> auditionKitSlot(int slot) async {
+  Future<void> auditionKitSlot(int slot, {KitVelocity? velocity}) async {
     if (!_initialized) return;
     await _ensureKitSources();
     if (slot < 0 || slot >= _kitSources.length) return;
@@ -487,7 +488,7 @@ class SoLoudAudioEngine implements AudioEngine {
     // of sliding into place after it.
     final handle = SoLoud.instance.play(
       _kitSources[slot],
-      volume: settings.volume,
+      volume: settings.volume * (velocity?.gain ?? 1.0),
       paused: true,
     );
     SoLoud.instance.setRelativePlaySpeed(handle, settings.rate);

@@ -23,6 +23,7 @@ import 'package:junglengine/audio/pattern_renderer.dart';
 import 'package:junglengine/audio/soloud_engine.dart';
 import 'package:junglengine/models/beat.dart';
 import 'package:junglengine/models/chop_pattern.dart';
+import 'package:junglengine/models/kit_pattern.dart';
 import 'package:junglengine/models/sub_lane.dart';
 import 'package:junglengine_engine/junglengine_engine.dart';
 
@@ -284,6 +285,7 @@ void main() {
         await engine.setSpec(_chopSpec());
         await engine.auditionSlice(3);
         await engine.auditionKitSlot(0);
+        await engine.auditionKitSlot(0, velocity: KitVelocity.soft);
         await engine.auditionClip(_oneShot(), looping: true);
         await Future<void>.delayed(const Duration(milliseconds: 60));
         await engine.stopAuditionClip();

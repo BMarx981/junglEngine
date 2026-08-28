@@ -585,6 +585,30 @@ void main() {
       expect(state().beat.kit.velocityAt(2, 3), isNull);
     });
 
+    test('the preview follows the level the tap wrote, down and up', () {
+      // The bug this locks out: every tap previewed at full, so walking a hit
+      // down to a ghost sounded identical to placing it.
+      for (final expected in [
+        KitVelocity.hard,
+        KitVelocity.medium,
+        KitVelocity.soft,
+      ]) {
+        controller().cycleKitCell(2, 3);
+        expect(engine.auditionedKitTaps.last.velocity, expected);
+      }
+      // Tapping it off is silent, so the run above is all there was.
+      controller().cycleKitCell(2, 3);
+      expect(engine.auditionedKitTaps, hasLength(3));
+
+      controller().paintKitCell(5, 0, KitVelocity.soft);
+      expect(engine.auditionedKitTaps.last.velocity, KitVelocity.soft);
+    });
+
+    test('a pad tap has no velocity on it, so it sounds full', () {
+      controller().auditionKitSlot(4);
+      expect(engine.auditionedKitTaps.last, (slot: 4, velocity: null));
+    });
+
     test('painting writes one level across a run, and can erase', () {
       for (var step = 0; step < 4; step++) {
         controller().paintKitCell(6, step, KitVelocity.soft);

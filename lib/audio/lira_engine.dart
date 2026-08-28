@@ -11,6 +11,7 @@ import 'package:junglengine/audio/audio_clip.dart';
 import 'package:junglengine/audio/engine.dart';
 import 'package:junglengine/audio/pattern_renderer.dart';
 import 'package:junglengine/audio/platform_session.dart';
+import 'package:junglengine/models/kit_pattern.dart';
 
 /// The Rust engine, behind the same interface flutter_soloud sits behind.
 ///
@@ -337,9 +338,10 @@ class LiraAudioEngine implements AudioEngine {
   }
 
   @override
-  Future<void> auditionKitSlot(int slot) async {
+  Future<void> auditionKitSlot(int slot, {KitVelocity? velocity}) async {
     if (!isInitialized || !_deviceOpen) return;
-    _check(_engine.auditionKitSlot(_handle, slot));
+    // 0 is not a level, which is how the engine reads "pad tap, sound it full".
+    _check(_engine.auditionKitSlot(_handle, slot, velocity?.toJson() ?? 0));
   }
 
   @override

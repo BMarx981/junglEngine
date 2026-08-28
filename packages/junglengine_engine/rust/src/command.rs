@@ -50,7 +50,12 @@ pub enum Command {
     /// Drop whatever [`When::NextBar`] queued, leaving what is playing alone.
     CancelQueued,
     AuditionSlice(i32),
-    AuditionKitSlot(i32),
+    /// A Kit slot, and the level to sound it at: 1, 2 or 3 when the tap wrote
+    /// a step, and anything else for a pad tap, which has no velocity on it.
+    AuditionKitSlot {
+        slot: i32,
+        velocity: i32,
+    },
     AuditionClip { clip: Clip, looping: bool },
     StopAuditionClip,
 }

@@ -492,19 +492,24 @@ pub unsafe extern "C" fn je_engine_audition_slice(
 /// Plays one Kit slot immediately, at that slot's own volume and pitch, for
 /// tap feedback. Never affects the transport.
 ///
+/// `velocity` is the level the tap wrote, in the spec's own encoding: 1 soft,
+/// 2 medium, 3 hard. Anything else is a pad tap, which has no velocity on it
+/// and sounds at full.
+///
 /// # Safety
 /// `handle` must come from [`je_engine_new`].
 #[no_mangle]
 pub unsafe extern "C" fn je_engine_audition_kit_slot(
     handle: *mut EngineHandle,
     slot: i32,
+    velocity: i32,
 ) -> i32 {
     guard(JE_ERR_PANIC, || {
         let Some(handle) = (unsafe { handle.as_mut() }) else {
             set_error("junglengine: null engine");
             return JE_ERR_NULL;
         };
-        send(handle, Command::AuditionKitSlot(slot))
+        send(handle, Command::AuditionKitSlot { slot, velocity })
     })
 }
 

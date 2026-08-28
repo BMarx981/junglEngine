@@ -923,8 +923,12 @@ class StudioController extends Notifier<StudioState> {
     final beat = state.beat;
     final next = beat.kit.cycled(slot, step);
     _commit(beat.copyWith(kit: next));
-    if (next.velocityAt(slot, step) != null) {
-      unawaited(_engine.auditionKitSlot(slot));
+    final velocity = next.velocityAt(slot, step);
+    // Previewed at the level the tap just wrote, so walking a hit down to a
+    // ghost sounds like walking it down. A preview that was always full would
+    // say a cell is filled, which is what the grid already says.
+    if (velocity != null) {
+      unawaited(_engine.auditionKitSlot(slot, velocity: velocity));
     }
   }
 
@@ -934,7 +938,9 @@ class StudioController extends Notifier<StudioState> {
     final beat = state.beat;
     if (beat.kit.velocityAt(slot, step) == velocity) return;
     _commit(beat.copyWith(kit: beat.kit.withCell(slot, step, velocity)));
-    if (velocity != null) unawaited(_engine.auditionKitSlot(slot));
+    if (velocity != null) {
+      unawaited(_engine.auditionKitSlot(slot, velocity: velocity));
+    }
   }
 
   void setSlotVolume(int slot, double volume) {

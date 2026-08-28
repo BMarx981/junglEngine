@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:junglengine/audio/audio_clip.dart';
 import 'package:junglengine/audio/pattern_renderer.dart';
+import 'package:junglengine/models/kit_pattern.dart';
 
 /// What the UI is allowed to know about playback.
 ///
@@ -195,7 +196,12 @@ abstract class AudioEngine {
 
   /// Plays one Kit slot immediately, at that slot's own volume and pitch, for
   /// tap feedback. Never affects the transport.
-  Future<void> auditionKitSlot(int slot);
+  ///
+  /// [velocity] is the level the tap wrote, so a step tapped down to soft
+  /// previews soft: the preview answers "what did I just write", and one that
+  /// always sounded hard would be answering a different question. Null is a
+  /// pad tap, which is not a step and so has no velocity on it.
+  Future<void> auditionKitSlot(int slot, {KitVelocity? velocity});
 
   /// Plays an arbitrary clip immediately, optionally looping, and replaces
   /// whatever the previous call started. This is how the import screen lets you

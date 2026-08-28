@@ -3,6 +3,7 @@ import 'package:junglengine/audio/audio_clip.dart';
 import 'package:junglengine/audio/engine.dart';
 import 'package:junglengine/audio/pattern_renderer.dart';
 import 'package:junglengine/audio/soloud_engine.dart';
+import 'package:junglengine/models/kit_pattern.dart';
 
 /// An [AudioEngine] that makes no sound but records everything it was asked to
 /// do, so the UI and the controller can be tested without an audio device.
@@ -41,6 +42,11 @@ class FakeAudioEngine implements AudioEngine {
   int cancelledQueues = 0;
   final List<int> auditioned = [];
   final List<int> auditionedSlots = [];
+
+  /// The same auditions with the level each was asked for, null where the tap
+  /// was a pad rather than a step. Kept beside [auditionedSlots] rather than
+  /// replacing it so a test that only cares which slot sounded stays readable.
+  final List<({int slot, KitVelocity? velocity})> auditionedKitTaps = [];
   final List<AudioClip> auditionedClips = [];
   bool auditionLooping = false;
   int auditionStopCount = 0;
@@ -148,7 +154,10 @@ class FakeAudioEngine implements AudioEngine {
       auditioned.add(sliceIndex);
 
   @override
-  Future<void> auditionKitSlot(int slot) async => auditionedSlots.add(slot);
+  Future<void> auditionKitSlot(int slot, {KitVelocity? velocity}) async {
+    auditionedSlots.add(slot);
+    auditionedKitTaps.add((slot: slot, velocity: velocity));
+  }
 
   @override
   Future<void> auditionClip(AudioClip clip, {bool looping = false}) async {
