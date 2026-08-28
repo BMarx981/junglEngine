@@ -353,15 +353,22 @@ void main() {
     expect(engine.lastSpec!.beat.sub.stepAt(7).isRest, isTrue);
   });
 
-  testWidgets('the sub panel exposes exactly five parameters', (tester) async {
+  testWidgets('the sub panel exposes exactly six parameters', (tester) async {
     await pumpStudio(tester);
 
     await tester.tap(inActionBar('SUB'));
     await tester.pumpAndSettle();
 
     expect(find.text(l10n.subTitle), findsOneWidget);
-    expect(find.byType(Slider), findsNWidgets(5));
-    for (final name in ['TONE', 'CUTOFF', 'DRIVE', 'DECAY', 'GLIDE']) {
+    expect(find.byType(Slider), findsNWidgets(6));
+    for (final name in [
+      'TONE',
+      'CUTOFF',
+      'DRIVE',
+      'DECAY',
+      'GLIDE',
+      'DETUNE',
+    ]) {
       expect(find.text(name), findsOneWidget);
     }
   });

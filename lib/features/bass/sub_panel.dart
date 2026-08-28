@@ -6,7 +6,7 @@ import 'package:junglengine/models/sub_patch.dart';
 import 'package:junglengine/state/studio.dart';
 import 'package:junglengine/theme.dart';
 
-/// What the five knobs are called, in order.
+/// What the six knobs are called, in order.
 ///
 /// Synth parameter names, so they stay English in every locale: these are the
 /// words printed on the panel of every hardware synth a producer has touched,
@@ -17,12 +17,14 @@ const List<String> subParameterLabels = [
   'DRIVE',
   'DECAY',
   'GLIDE',
+  'DETUNE',
 ];
 
-/// The sub synth's controls. All five of them.
+/// The sub synth's controls. All six of them.
 ///
-/// Sine to triangle, one lowpass, drive, amp envelope, glide. The spec ceiling
-/// is in CLAUDE.md and this sheet is the whole of it.
+/// Sine to triangle to saw, two of them detuned, one lowpass, drive, amp
+/// envelope, glide. The spec ceiling is in CLAUDE.md and this sheet is the
+/// whole of it.
 class SubPanel extends ConsumerWidget {
   const SubPanel({super.key});
 
@@ -71,12 +73,28 @@ class SubPanel extends ConsumerWidget {
                 ),
               ],
             ),
-            for (var i = 0; i < SubPatch.parameterCount; i++)
-              _ParameterRow(
-                label: subParameterLabels[i],
-                value: patch.parameter(i),
-                onChanged: (v) => controller.setSubParameter(i, v),
+            // Six rows of full height slider is 23px more than the shortest
+            // phone's sheet on the smallest iPhone SE, so the list scrolls
+            // rather than the rows getting shorter. Shrinking the tap target
+            // would buy the space back three times over and cost the one
+            // interaction this sheet exists for. On every other phone in the
+            // sweep there is nothing to scroll and this changes nothing.
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < SubPatch.parameterCount; i++)
+                      _ParameterRow(
+                        label: subParameterLabels[i],
+                        value: patch.parameter(i),
+                        onChanged: (v) => controller.setSubParameter(i, v),
+                      ),
+                  ],
+                ),
               ),
+            ),
           ],
         ),
       ),

@@ -167,24 +167,31 @@ pub struct SubStep {
     pub accent: bool,
 }
 
-/// The sub synth's entire control surface. Five, and five is the ceiling.
+/// The sub synth's entire control surface. Six, and six is the ceiling.
 #[derive(Clone, Copy, Debug)]
 pub struct SubPatch {
+    /// Sine at 0, triangle at 0.5, saw at 1.
     pub tone: f64,
     pub cutoff: f64,
     pub drive: f64,
     pub decay: f64,
     pub glide: f64,
+    /// The Reese knob: 0 .. 30 cents either side of the note, 0 being one
+    /// oscillator's worth of sound out of the pair.
+    pub detune: f64,
 }
 
 impl Default for SubPatch {
     fn default() -> Self {
         SubPatch {
-            tone: 0.25,
+            // 0.125 on the three way morph is the 0.25 this default used to be
+            // on the old sine to triangle blend. Same sound, new scale.
+            tone: 0.125,
             cutoff: 0.45,
             drive: 0.2,
             decay: 0.35,
             glide: 0.3,
+            detune: 0.0,
         }
     }
 }
@@ -414,6 +421,12 @@ fn read_sub(value: Option<&Value>, steps: usize) -> Vec<SubStep> {
         .collect()
 }
 
+/// No `tone` migration here, unlike `SubPatch.fromJson` on the Dart side.
+///
+/// That one reads project files a user saved months ago. This one reads a
+/// render spec Dart just wrote, so `tone` is always already on the three way
+/// scale and `detune` is always present. Migrating twice would halve a live
+/// patch.
 fn read_patch(value: Option<&Value>) -> SubPatch {
     let d = SubPatch::default();
     match value {
@@ -423,6 +436,7 @@ fn read_patch(value: Option<&Value>) -> SubPatch {
             drive: read_unit(v.get("drive"), d.drive),
             decay: read_unit(v.get("decay"), d.decay),
             glide: read_unit(v.get("glide"), d.glide),
+            detune: read_unit(v.get("detune"), d.detune),
         },
         _ => d,
     }

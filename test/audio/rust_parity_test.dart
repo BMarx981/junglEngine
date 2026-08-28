@@ -151,6 +151,7 @@ void main() {
     parity('a kit pattern with velocities, volumes and pitch', _kitSpec());
     parity('a song running both machines back to back', _songSpec());
     parity('a sub lane of ties, accents and glide', _subSpec());
+    parity('the same lane as a Reese', _subSpec(patch: _reesePatch));
 
     offlineParity('a chop pattern with every step modifier and swing',
         _chopSpec());
@@ -158,6 +159,7 @@ void main() {
         _kitSpec());
     offlineParity('a song running both machines back to back', _songSpec());
     offlineParity('a sub lane of ties, accents and glide', _subSpec());
+    offlineParity('the same lane as a Reese', _subSpec(patch: _reesePatch));
   }, skip: cargo == null ? 'no cargo on PATH: the Rust engine was not built' : null);
 }
 
@@ -387,18 +389,36 @@ RenderSpec _songSpec() {
 
 /// The sub lane on its own, over an empty drum grid, so nothing masks a
 /// difference in the synth.
-RenderSpec _subSpec() {
+/// Both oscillators well into the saw half of the tone knob and pushed as far
+/// apart as the knob goes.
+///
+/// The default patch leaves detune at 0, where the two oscillators are the same
+/// double and any porting mistake in the pair cancels itself out. This is the
+/// patch that would catch one: a wrong detune ratio, a PolyBLEP branch that
+/// disagrees, or a tone morph split at a different point.
+const SubPatch _reesePatch = SubPatch(
+  tone: 0.85,
+  cutoff: 0.8,
+  drive: 0.4,
+  decay: 0.9,
+  glide: 0.75,
+  detune: 1.0,
+);
+
+RenderSpec _subSpec({
+  SubPatch patch = const SubPatch(
+    tone: 0.1,
+    cutoff: 0.8,
+    drive: 0.9,
+    decay: 0.9,
+    glide: 0.75,
+  ),
+}) {
   final beat = Beat(
     id: 'sub',
     name: 'Sub',
     swing: 0,
-    subPatch: const SubPatch(
-      tone: 0.1,
-      cutoff: 0.8,
-      drive: 0.9,
-      decay: 0.9,
-      glide: 0.75,
-    ),
+    subPatch: patch,
     chop: ChopPattern.empty(),
     sub: _subLane(const [
       SubStep(semitone: 0),

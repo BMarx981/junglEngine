@@ -247,8 +247,8 @@ void main() {
   });
 
   group('SubPatch', () {
-    test('exposes exactly five parameters', () {
-      expect(SubPatch.parameterCount, 5);
+    test('exposes exactly six parameters', () {
+      expect(SubPatch.parameterCount, 6);
       // The panel must have a word for each one. The labels moved out of the
       // model so they could stay English while everything around them is
       // translated, and this is what keeps the two halves in step.
@@ -259,6 +259,64 @@ void main() {
       const patch = SubPatch();
       expect(patch.withParameter(1, 4).cutoff, 1.0);
       expect(patch.withParameter(1, -2).cutoff, 0.0);
+    });
+
+    test('every parameter index round trips through withParameter', () {
+      const patch = SubPatch();
+      for (var i = 0; i < SubPatch.parameterCount; i++) {
+        expect(patch.withParameter(i, 0.6).parameter(i), 0.6, reason: 'index $i');
+      }
+    });
+
+    test('a fresh patch is the sub as it was before the second oscillator', () {
+      // Detune 0 and a tone in the lower half of the morph. A user who never
+      // touches the new knob never hears it.
+      const patch = SubPatch();
+      expect(patch.detune, 0.0);
+      expect(patch.tone, lessThanOrEqualTo(0.5));
+    });
+
+    group('tone migration', () {
+      test('a patch saved before the Reese is rescaled onto the new morph', () {
+        // No detune key, so tone still means sine to triangle across 0..1.
+        final patch = SubPatch.fromJson(const {
+          'tone': 0.25,
+          'cutoff': 0.7,
+          'drive': 0.2,
+          'decay': 0.35,
+          'glide': 0.9,
+        });
+        // Exactly half, not approximately: halving is exact in binary, which is
+        // what lets the migrated patch render the samples it always did.
+        expect(patch.tone, 0.125);
+        expect(patch.detune, 0.0);
+        // Nothing else moves.
+        expect(patch.cutoff, 0.7);
+        expect(patch.glide, 0.9);
+      });
+
+      test('full triangle lands at the middle of the new knob', () {
+        expect(SubPatch.fromJson(const {'tone': 1.0}).tone, 0.5);
+      });
+
+      test('a patch saved after it is read as written', () {
+        final patch = SubPatch.fromJson(const {'tone': 0.8, 'detune': 0.4});
+        expect(patch.tone, 0.8);
+        expect(patch.detune, 0.4);
+      });
+
+      test('a round trip is stable, so migration happens exactly once', () {
+        const original = SubPatch(tone: 0.9, detune: 0.6);
+        final once = SubPatch.fromJson(original.toJson());
+        final twice = SubPatch.fromJson(once.toJson());
+        expect(once.tone, 0.9);
+        expect(twice.tone, 0.9);
+        expect(twice.detune, 0.6);
+      });
+
+      test('a patch with no tone at all takes the new default', () {
+        expect(SubPatch.fromJson(const {'cutoff': 0.5}).tone, const SubPatch().tone);
+      });
     });
   });
 

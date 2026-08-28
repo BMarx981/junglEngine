@@ -103,7 +103,7 @@ sound?
 - BPM autodetection
 - Kit choke groups and per slot effects
 - Tilt and accelerometer gestures
-- Polyphonic sub or any second synth
+- Polyphonic sub or any second synth. The Reese oscillator added after M5 sits inside the one monophonic voice, so it is a second oscillator and not a second synth. This line still means what it always meant: one voice, one instrument. See the sub synth spec in CLAUDE.md for the ceiling and the test a new parameter has to pass.
 - Effects sends, reverb, delay
 - Cloud sync and accounts
 - Tablet and desktop layouts

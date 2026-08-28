@@ -41,7 +41,9 @@ The magic moment: drop a slice on a step, hit play, the break is rearranged and 
 
 ## Sub synth spec (do not grow this)
 
-Monophonic. Sine or triangle core, one lowpass, drive, amp envelope, glide. Five parameters max exposed to the user. Accent is a per step modifier, not a sixth knob: it opens the filter and lifts the level a few dB on that note only, because the filter alone measurably makes the note duller rather than louder. No wavetables, no mod matrix, no additional oscillators. Refuse politely and point here.
+Monophonic. Two oscillators detuned against each other, each morphing sine to triangle to saw; one lowpass, drive, amp envelope, glide. Six parameters max exposed to the user: TONE, CUTOFF, DRIVE, DECAY, GLIDE, DETUNE. Accent is a per step modifier, not a seventh knob: it opens the filter and lifts the level a few dB on that note only, because the filter alone measurably makes the note duller rather than louder. No wavetables, no mod matrix, no third oscillator. Refuse politely and point here.
+
+The ceiling was five until the Reese, and it moved once, deliberately. The reasoning is recorded here so nobody has to reconstruct it: a Reese is two detuned saws beating against each other, the beating is the whole sound, and no filter or drive setting fakes it. The only honest choices were to refuse the Reese or to add an oscillator. Two oscillators in one voice is still monophonic, so "polyphonic sub or any second synth" stays parked in MILESTONES.md and still means what it always meant. The test the addition had to pass, and the test any future one has to pass: **DETUNE at 0 is sample for sample the sub that shipped before it.** A parameter that cannot be zeroed back into the old instrument makes a different instrument, and the answer to that is still no. Six is the new ceiling, not a running total.
 
 ## Localization (do not grow this)
 
@@ -54,7 +56,7 @@ and there is not going to be one**; to see another locale on a device, run with
   same directory and committed. Reach them with `context.l10n.someKey`.
 - **The tier rule is in `lib/l10n/GLOSSARY.md` and that file is the authority.**
   Hardware and producer vocabulary stays English everywhere (BPM, SWING, KIT,
-  SUB, VOL, PITCH, the sub synth's five parameter names, the kit slot labels,
+  SUB, VOL, PITCH, the sub synth's six parameter names, the kit slot labels,
   note names). Prose, counts and errors get translated. When adding a string,
   decide which tier it is in and add it to the glossary if it is a new Tier 1
   word.

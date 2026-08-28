@@ -1,8 +1,9 @@
 //! The whole sub synth: one monophonic voice.
 //!
 //! A direct port of `lib/audio/sub_voice.dart`, coefficient for coefficient.
-//! Sine/triangle core, one lowpass, drive, amp envelope, glide. Five knobs. If
-//! something wants a sixth, the answer is still no: see CLAUDE.md.
+//! Two detuned oscillators morphing sine to triangle to saw, one lowpass,
+//! drive, amp envelope, glide. Six knobs. If something wants a seventh, the
+//! answer is still no: see CLAUDE.md.
 
 use crate::spec::SubPatch;
 
@@ -18,14 +19,22 @@ const ACCENT_GAIN: f64 = 1.35;
 
 const ATTACK_SECONDS: f64 = 0.004;
 
+/// The widest the oscillators spread, in cents either side of the note. Mirrors
+/// `SubPatch.maxDetuneCents` on the Dart side.
+const MAX_DETUNE_CENTS: f64 = 30.0;
+
 pub struct SubVoice {
     sample_rate: f64,
-    patch: SubPatch,
 
-    phase: f64,
+    phase_a: f64,
+    phase_b: f64,
+    detune_ratio: f64,
     freq: f64,
     target_freq: f64,
     glide_coeff: f64,
+
+    saw_morph: bool,
+    tone_blend: f64,
 
     low: f64,
     band: f64,
@@ -47,11 +56,14 @@ impl SubVoice {
     pub fn new(sample_rate: u32) -> Self {
         let mut voice = SubVoice {
             sample_rate: sample_rate as f64,
-            patch: SubPatch::default(),
-            phase: 0.0,
+            phase_a: 0.0,
+            phase_b: 0.0,
+            detune_ratio: 1.0,
             freq: 55.0,
             target_freq: 55.0,
             glide_coeff: 1.0,
+            saw_morph: false,
+            tone_blend: 0.25,
             low: 0.0,
             band: 0.0,
             filter_f: 0.2,
@@ -74,8 +86,6 @@ impl SubVoice {
     }
 
     pub fn set_patch(&mut self, patch: SubPatch) {
-        self.patch = patch;
-
         let cutoff_hz = 60.0 * 50f64.powf(patch.cutoff);
         // Chamberlin is only stable well below Nyquist/2.
         let safe = cutoff_hz.min(self.sample_rate / 6.0);
@@ -103,6 +113,21 @@ impl SubVoice {
 
         self.drive_amount = 1.0 + patch.drive * 11.0;
         self.drive_makeup = 1.0 / (1.0 + patch.drive * 2.2);
+
+        // Lower half of the knob is the sine to triangle blend this synth
+        // always had, at half the travel. Upper half carries on into the saw.
+        self.saw_morph = patch.tone > 0.5;
+        self.tone_blend = if self.saw_morph {
+            (patch.tone - 0.5) * 2.0
+        } else {
+            patch.tone * 2.0
+        };
+
+        // Cents rather than hertz, so the beat rate stays proportional as the
+        // bassline moves. At detune 0 this is exactly 1 and the two
+        // oscillators are the same oscillator.
+        let cents = patch.detune * MAX_DETUNE_CENTS;
+        self.detune_ratio = 2f64.powf(cents / 1200.0);
     }
 
     /// Starts a note. With `glide` the pitch slides from wherever it is and the
@@ -115,7 +140,10 @@ impl SubVoice {
         self.filter_f = if accent { self.open_f } else { self.closed_f };
         if !glide {
             self.freq = frequency;
-            self.phase = 0.0;
+            // Both oscillators start together every time, so the beating
+            // always begins from the same place and a render is repeatable.
+            self.phase_a = 0.0;
+            self.phase_b = 0.0;
             self.env = if self.env > 0.35 { self.env } else { 0.0 };
         }
     }
@@ -131,7 +159,8 @@ impl SubVoice {
 
     /// Hard reset, so a rewind renders identically twice.
     pub fn reset(&mut self) {
-        self.phase = 0.0;
+        self.phase_a = 0.0;
+        self.phase_b = 0.0;
         self.env = 0.0;
         self.gate = false;
         self.accent = false;
@@ -151,14 +180,21 @@ impl SubVoice {
 
         self.freq += (self.target_freq - self.freq) * self.glide_coeff;
 
-        self.phase += self.freq / self.sample_rate;
-        if self.phase >= 1.0 {
-            self.phase -= self.phase.floor();
+        let dt_a = self.freq * self.detune_ratio / self.sample_rate;
+        let dt_b = self.freq / self.detune_ratio / self.sample_rate;
+
+        self.phase_a += dt_a;
+        if self.phase_a >= 1.0 {
+            self.phase_a -= self.phase_a.floor();
+        }
+        self.phase_b += dt_b;
+        if self.phase_b >= 1.0 {
+            self.phase_b -= self.phase_b.floor();
         }
 
-        let sine = (2.0 * std::f64::consts::PI * self.phase).sin();
-        let triangle = 4.0 * (self.phase - 0.5).abs() - 1.0;
-        let mut x = sine + (triangle - sine) * self.patch.tone;
+        // Sum and halve. At detune 0 the two are bit for bit identical and this
+        // is the identity, which is the promise the spec makes about this knob.
+        let mut x = (self.osc(self.phase_a, dt_a) + self.osc(self.phase_b, dt_b)) * 0.5;
 
         // Soft clip into the filter, then take the makeup back out.
         x = soft_clip(x * self.drive_amount) * self.drive_makeup;
@@ -179,6 +215,48 @@ impl SubVoice {
 
         self.low * self.env * if self.accent { ACCENT_GAIN } else { 1.0 }
     }
+
+    /// One oscillator, morphed by the tone knob.
+    ///
+    /// Sine and triangle both start the cycle at their peak and fall through
+    /// the first half, so the saw is a falling ramp too. A rising one is the
+    /// same spectrum with the phase flipped, but it would fight the triangle
+    /// through the middle of the morph instead of tracking it.
+    fn osc(&self, phase: f64, dt: f64) -> f64 {
+        let sine = (2.0 * std::f64::consts::PI * phase).sin();
+        let triangle = 4.0 * (phase - 0.5).abs() - 1.0;
+        if !self.saw_morph {
+            // Untouched from the single oscillator days, so a migrated patch
+            // renders the samples it always did.
+            return sine + (triangle - sine) * self.tone_blend;
+        }
+        let saw = 1.0 - 2.0 * phase + poly_blep(phase, dt);
+        triangle + (saw - triangle) * self.tone_blend
+    }
+}
+
+/// PolyBLEP: rounds off the saw's jump so it does not fold aliases back down
+/// into the audible band.
+///
+/// Honest about the size of this: the lowpass tops out at 3 kHz, so it was
+/// already burying most of what a naive ramp folds down, and the difference is
+/// small at the bottom of the register. It matters more with the cutoff wide
+/// open on a note up near the top of the lane, and it costs two multiplies on
+/// the samples either side of the wrap. Cheap enough that shipping the
+/// aliasing instead would be a choice, not a tradeoff.
+fn poly_blep(phase: f64, dt: f64) -> f64 {
+    if dt <= 0.0 {
+        return 0.0;
+    }
+    if phase < dt {
+        let t = phase / dt;
+        return t + t - t * t - 1.0;
+    }
+    if phase > 1.0 - dt {
+        let t = (phase - 1.0) / dt;
+        return t * t + t + t + 1.0;
+    }
+    0.0
 }
 
 /// Rational tanh approximation. Cheaper than a real one and close enough for a

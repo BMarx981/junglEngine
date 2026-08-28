@@ -16,7 +16,7 @@ there is nothing to do about them. They are listed here only so that when one
 turns up *inside* a translatable string, you leave it alone:
 
 > BPM · SWING · SLICES · SLICE · KIT · CHOP · SUB · VOL · PITCH ·
-> TONE · CUTOFF · DRIVE · DECAY · GLIDE · WAV · MIDI · PRO ·
+> TONE · CUTOFF · DRIVE · DECAY · GLIDE · DETUNE · WAV · MIDI · PRO ·
 > kHz · bit · 44.1 kHz 16 bit · Kong · NN-XT · Files · iCloud · Drive ·
 > the note names C to B · the kit slot labels KICK SNR RIM CLAP CH OH SHKR
 > CNGA WOOD TAMB TOM · the app name junglEngine · the pack names Starter and

@@ -21,9 +21,11 @@ class Project {
   });
 
   /// Bumped when a change to the JSON shape needs old files handled. M1 added
-  /// Kit fields and M3 added the imports, but every addition has been just
-  /// that: a version 1 file still opens.
-  static const int schemaVersion = 3;
+  /// Kit fields and M3 added the imports, and both were purely additive. 4 is
+  /// the first version where an existing field changed meaning: the sub's TONE
+  /// now morphs sine to triangle to saw over the same 0..1. A version 1 file
+  /// still opens, and `SubPatch.fromJson` rescales the old tone on the way in.
+  static const int schemaVersion = 4;
 
   final String id;
   final String name;

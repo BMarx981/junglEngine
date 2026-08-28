@@ -4,8 +4,9 @@ import 'package:junglengine/models/sub_patch.dart';
 
 /// The whole sub synth: one monophonic voice.
 ///
-/// Sine/triangle core, one lowpass, drive, amp envelope, glide. Five knobs.
-/// If something wants a sixth, the answer is no. See CLAUDE.md.
+/// Two detuned oscillators morphing sine to triangle to saw, one lowpass,
+/// drive, amp envelope, glide. Six knobs. If something wants a seventh, the
+/// answer is no. See CLAUDE.md.
 class SubVoice {
   SubVoice({required this.sampleRate}) {
     setPatch(const SubPatch());
@@ -13,13 +14,21 @@ class SubVoice {
 
   final int sampleRate;
 
-  SubPatch _patch = const SubPatch();
-
-  // Oscillator.
-  double _phase = 0;
+  // Oscillators. Two of them, one voice: the pair is what makes a Reese, and
+  // at detune 0 they run in lockstep and sum back to the single oscillator
+  // this synth had before.
+  double _phaseA = 0;
+  double _phaseB = 0;
+  double _detuneRatio = 1;
   double _freq = 55;
   double _targetFreq = 55;
   double _glideCoeff = 1;
+
+  /// Whether [SubPatch.tone] is in its upper half, morphing triangle to saw.
+  bool _sawMorph = false;
+
+  /// The morph amount within whichever half of the tone knob is in play.
+  double _toneBlend = 0.25;
 
   // Chamberlin state variable filter.
   double _low = 0;
@@ -56,8 +65,6 @@ class SubVoice {
   bool get isSilent => !_gate && _env < 0.0001;
 
   void setPatch(SubPatch patch) {
-    _patch = patch;
-
     final cutoffHz = 60.0 * math.pow(50.0, patch.cutoff).toDouble();
     // Chamberlin is only stable well below Nyquist/2.
     final safe = math.min(cutoffHz, sampleRate / 6);
@@ -79,6 +86,17 @@ class SubVoice {
 
     _driveAmount = 1.0 + patch.drive * 11.0;
     _driveMakeup = 1.0 / (1.0 + patch.drive * 2.2);
+
+    // Lower half of the knob is the sine to triangle blend this synth always
+    // had, at half the travel. Upper half carries on into the saw.
+    _sawMorph = patch.tone > 0.5;
+    _toneBlend = _sawMorph ? (patch.tone - 0.5) * 2 : patch.tone * 2;
+
+    // Cents rather than hertz, so the beat rate stays proportional as the
+    // bassline moves. At detune 0 this is exactly 1 and the two oscillators
+    // are the same oscillator.
+    final cents = patch.detune * SubPatch.maxDetuneCents;
+    _detuneRatio = math.pow(2.0, cents / 1200.0).toDouble();
   }
 
   /// Starts a note. With [glide] the pitch slides from wherever it is and the
@@ -91,7 +109,11 @@ class SubVoice {
     _filterF = accent ? _openF : _closedF;
     if (!glide) {
       _freq = frequency;
-      _phase = 0;
+      // Both oscillators start together every time, so the beating always
+      // begins from the same place and a render is repeatable. Free running
+      // phase would be more analogue and would make export non deterministic.
+      _phaseA = 0;
+      _phaseB = 0;
       _env = _env > 0.35 ? _env : 0;
     }
   }
@@ -107,7 +129,8 @@ class SubVoice {
 
   /// Hard reset. Used when the transport rewinds so playback is deterministic.
   void reset() {
-    _phase = 0;
+    _phaseA = 0;
+    _phaseB = 0;
     _env = 0;
     _gate = false;
     _accent = false;
@@ -127,12 +150,17 @@ class SubVoice {
 
     _freq += (_targetFreq - _freq) * _glideCoeff;
 
-    _phase += _freq / sampleRate;
-    if (_phase >= 1.0) _phase -= _phase.floorToDouble();
+    final dtA = _freq * _detuneRatio / sampleRate;
+    final dtB = _freq / _detuneRatio / sampleRate;
 
-    final sine = math.sin(2 * math.pi * _phase);
-    final triangle = 4.0 * (_phase - 0.5).abs() - 1.0;
-    var x = sine + (triangle - sine) * _patch.tone;
+    _phaseA += dtA;
+    if (_phaseA >= 1.0) _phaseA -= _phaseA.floorToDouble();
+    _phaseB += dtB;
+    if (_phaseB >= 1.0) _phaseB -= _phaseB.floorToDouble();
+
+    // Sum and halve. At detune 0 the two are bit for bit identical and this is
+    // the identity, which is the promise the spec makes about this knob.
+    var x = (_osc(_phaseA, dtA) + _osc(_phaseB, dtB)) * 0.5;
 
     // Soft clip into the filter, then take the makeup back out.
     x = _tanh(x * _driveAmount) * _driveMakeup;
@@ -150,6 +178,46 @@ class SubVoice {
     }
 
     return _low * _env * (_accent ? _accentGain : 1.0);
+  }
+
+  /// One oscillator, morphed by the tone knob.
+  ///
+  /// Sine and triangle both start the cycle at their peak and fall through the
+  /// first half, so the saw is a falling ramp too. A rising one is the same
+  /// spectrum with the phase flipped, but it would fight the triangle through
+  /// the middle of the morph instead of tracking it.
+  double _osc(double phase, double dt) {
+    final sine = math.sin(2 * math.pi * phase);
+    final triangle = 4.0 * (phase - 0.5).abs() - 1.0;
+    if (!_sawMorph) {
+      // Untouched from the single oscillator days, so a migrated patch renders
+      // the samples it always did.
+      return sine + (triangle - sine) * _toneBlend;
+    }
+    final saw = 1.0 - 2.0 * phase + _polyBlep(phase, dt);
+    return triangle + (saw - triangle) * _toneBlend;
+  }
+
+  /// PolyBLEP: rounds off the saw's jump so it does not fold aliases back down
+  /// into the audible band.
+  ///
+  /// Honest about the size of this: the lowpass tops out at 3 kHz, so it was
+  /// already burying most of what a naive ramp folds down, and the difference
+  /// is small at the bottom of the register. It matters more with the cutoff
+  /// wide open on a note up near the top of the lane, and it costs two
+  /// multiplies on the samples either side of the wrap. Cheap enough that
+  /// shipping the aliasing instead would be a choice, not a tradeoff.
+  static double _polyBlep(double phase, double dt) {
+    if (dt <= 0) return 0;
+    if (phase < dt) {
+      final t = phase / dt;
+      return t + t - t * t - 1.0;
+    }
+    if (phase > 1.0 - dt) {
+      final t = (phase - 1.0) / dt;
+      return t * t + t + t + 1.0;
+    }
+    return 0;
   }
 
   static double _tanh(double x) {
